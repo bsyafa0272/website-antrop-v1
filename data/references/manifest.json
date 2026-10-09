@@ -1,0 +1,44 @@
+{
+  "manifestVersion": "1.0.0",
+  "status": "blocked_pending_official_data_and_independent_benchmarks",
+  "clinicalZScoresEnabled": false,
+  "lastReviewed": "2026-10-09",
+  "standards": [
+    {
+      "id": "WHO_CGS_2006",
+      "name": "WHO Child Growth Standards",
+      "version": "2006",
+      "officialSource": "https://www.who.int/tools/child-growth-standards",
+      "algorithmSource": "https://www.who.int/toolkits/child-growth-standards/software",
+      "algorithmPackage": "WHO anthro R package 1.1.0",
+      "algorithmLicense": "GPL-3",
+      "datasetFiles": [],
+      "datasetVersion": null,
+      "sha256": null,
+      "datasetLicenseReviewed": false,
+      "independentBenchmarkStatus": "not_run",
+      "clinicalActivation": "disabled"
+    },
+    {
+      "id": "WHO_GGR_2007",
+      "name": "WHO Growth Reference 2007",
+      "version": "2007",
+      "officialSource": "https://www.who.int/tools/growth-reference-data-for-5to19-years",
+      "algorithmSource": "https://www.who.int/tools/growth-reference-data-for-5to19-years/application-tools",
+      "algorithmPackage": "WHO anthroplus R package 1.1.0",
+      "algorithmLicense": "GPL-3-or-later",
+      "datasetFiles": [],
+      "datasetVersion": null,
+      "sha256": null,
+      "datasetLicenseReviewed": false,
+      "independentBenchmarkStatus": "not_run",
+      "clinicalActivation": "disabled"
+    }
+  ],
+  "nationalInterpretation": {
+    "name": "Permenkes RI Nomor 2 Tahun 2020 tentang Standar Antropometri Anak",
+    "source": "https://jdih.kemkes.go.id/storage/documents/pdfs/2020permenkes002.pdf",
+    "statusChecked": "2026-10-09",
+    "status": "listed_as_in_force_on_government_legal_database"
+  }
+}

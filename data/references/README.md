@@ -1,0 +1,1 @@
+Folder ini sengaja belum berisi tabel LMS klinis. Jangan menambahkan nilai tabel yang disalin dari gambar grafik atau hasil perkiraan. Tabel hanya boleh ditambahkan setelah diunduh dari sumber resmi, versi/hash/lisensi dicatat di `manifest.json`, dan keluaran dibandingkan dengan WHO Anthro/AnthroPlus independen. Sampai itu selesai, semua Z-score dan kategori tetap tidak dihitung.

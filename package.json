@@ -1,0 +1,10 @@
+{
+  "name": "pediatric-anthropometry-demo",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Isolated demo data model and longitudinal pediatric anthropometry UI",
+  "scripts": {
+    "test": "node tests/age.test.cjs && node tests/growth-engine.test.cjs && node tests/growth-chart.test.cjs && node tests/repository.test.cjs && node tests/data-service.test.cjs && node tests/ui-smoke.test.cjs && node tests/production-fail-closed.test.cjs",
+    "check": "node --check js/data.js && node --check js/anthropometry.js && node --check js/growth-reference-data.js && node --check js/growth-engine.js && node --check js/growth-chart.js && node --check js/repository.js && node --check js/data-service.js && node --check js/app.js && node --check tests/age.test.cjs && node --check tests/growth-engine.test.cjs && node --check tests/growth-chart.test.cjs && node --check tests/repository.test.cjs && node --check tests/data-service.test.cjs && node --check tests/ui-smoke.test.cjs && node --check tests/production-fail-closed.test.cjs"
+  }
+}

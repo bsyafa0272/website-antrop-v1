@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>Pemantauan Antropometri Anak | Klinik Padjadjaran Jatinangor</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">KP</div>
+        <div><strong>Klinik Padjadjaran</strong><span>Jatinangor</span></div>
+      </div>
+      <div class="side-label">PEMANTAUAN ANAK</div>
+      <nav class="nav-list" aria-label="Navigasi utama">
+        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">▦</span> Dashboard</button>
+        <button class="nav-item" data-page="patients"><span class="nav-icon">♙</span> Daftar Pasien</button>
+        <button class="nav-item" data-page="exam"><span class="nav-icon">＋</span> Pemeriksaan Baru</button>
+        <button class="nav-item" data-page="history"><span class="nav-icon">◷</span> Riwayat Pemeriksaan</button>
+        <button class="nav-item" data-page="growth"><span class="nav-icon">⌁</span> Kurva Pertumbuhan</button>
+        <button class="nav-item" data-page="reports"><span class="nav-icon">▤</span> Ringkasan Laporan</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="demo-note" id="environment-status"><span class="status-dot" id="environment-status-dot"></span><div><strong id="environment-title">Memuat layanan data…</strong><p id="environment-detail">Status penyimpanan akan ditampilkan setelah inisialisasi.</p></div></div>
+        <p class="version">Model data longitudinal · v0.2</p>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Buka navigasi">☰</button>
+        <div class="breadcrumb"><span>Modul klinis</span><span class="crumb-sep">/</span><strong id="breadcrumb-current">Dashboard</strong></div>
+        <div class="top-actions"><span class="secure-label" id="environment-indicator">Memuat status data…</span><div class="avatar" id="user-mode-avatar" aria-label="Lingkungan demonstrasi">DEMO</div></div>
+      </header>
+      <div class="content" id="app-content" tabindex="-1"></div>
+      <footer class="footer"><span>Klinik Padjadjaran Jatinangor</span><span>Antarmuka demonstrasi · Tidak untuk keputusan klinis</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="js/data.js"></script>
+  <script src="js/anthropometry.js"></script>
+  <script src="js/growth-reference-data.js"></script>
+  <script src="js/growth-engine.js"></script>
+  <script src="js/growth-chart.js"></script>
+  <script src="js/repository.js"></script>
+  <script src="js/data-service.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

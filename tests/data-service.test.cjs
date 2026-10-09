@@ -1,0 +1,70 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const path = require('path');
+const ROOT = path.resolve(__dirname, '..');
+const window = {};
+const ctx = {window, URL, URLSearchParams, Date, Math, JSON, Object, String, Number, Error, Promise, Set, Array, encodeURIComponent, location: {href: 'https://clinic.example/app/'}};
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'js/data-service.js'), 'utf8'), ctx);
+const Service = window.AnthropometryDataService;
+const config = {enabled: true, baseUrl: 'https://clinic.example/api', routes: {
+  patients: '/patients', patient: '/patients/{patientId}', exams: '/exams', exam: '/exams/{examId}',
+  interpretations: '/interpretations', audit: '/audit'
+}, readRetries: 2};
+function response(status, body) { return {status, ok: status >= 200 && status < 300, json: async () => body}; }
+(async () => {
+  const requests = [];
+  const fetchMock = async (url, opts) => {
+    requests.push({url, opts});
+    if (url.endsWith('/patients')) return response(200, {data: [{id: 'P1', name: 'Pasien Demo'}]});
+    if (url.includes('/exams?')) return response(200, {data: [{id: 'E1', patientId: 'P1', rmeVisitId: 'V1', examDate: '2026-01-01'}]});
+    if (url.endsWith('/exams') && opts.method === 'GET') return response(200, {data: [{id: 'E1', patientId: 'P1', rmeVisitId: 'V1', examDate: '2026-01-01'}]});
+    if (url.endsWith('/exams') && opts.method === 'POST') return response(201, {data: {id: 'E2', patientId: 'P1', rmeVisitId: 'V2', examDate: '2026-02-01', anthropometryCalculation: {algorithmVersion: 'engine-test', referenceSchemaVersion: 'schema-test', calculatedAt: '2026-10-09T00:00:00.000Z', overallStatus: 'not_calculated', results: []}}});
+    if (url.endsWith('/interpretations')) return response(200, {data: []});
+    if (url.endsWith('/audit')) return response(200, {data: []});
+    if (url.endsWith('/patients/P1')) return response(200, {data: {id: 'P1', name: 'Pasien Demo'}});
+    if (url.endsWith('/patients/P404')) return response(404, {message: 'not found'});
+    if (url.endsWith('/exams/E404')) return response(404, {message: 'not found'});
+    return response(200, {data: []});
+  };
+  const api = Service.createApiAdapter(config, {fetch: fetchMock, clock: () => new Date('2026-10-09T00:00:00Z')});
+  const profile = await api.getPatient('P1'); assert.equal(profile.id, 'P1');
+  const snapshot = await api.getSnapshot(); assert.equal(snapshot.patients.length, 1); assert.equal(snapshot.exams[0].patientId, 'P1');
+  const history = await api.listExams('P1'); assert.equal(history[0].rmeVisitId, 'V1'); assert(requests.some(r => new URL(r.url).searchParams.get('patientId') === 'P1'));
+  const saved = await api.createExam({patientId: 'P1', rmeVisitId: 'V2', examDate: '2026-02-01', weightKg: 12});
+  assert.equal(saved.patientId, 'P1'); assert.equal(saved.rmeVisitId, 'V2');
+  const write = requests.find(r => r.opts.method === 'POST' && r.url.endsWith('/exams'));
+  assert.equal(JSON.parse(write.opts.body).patientId, 'P1'); assert.equal(JSON.parse(write.opts.body).rmeVisitId, 'V2'); assert.equal(write.opts.credentials, 'same-origin'); assert.equal(write.opts.headers.Authorization, undefined);
+  let missing = false; try { await api.getExam('E404'); } catch (e) { missing = e.code === 'NOT_FOUND'; } assert(missing);
+  let patientMissing = false; try { await api.getPatient('P404'); } catch (e) { patientMissing = e.code === 'NOT_FOUND'; } assert(patientMissing);
+  let unavailableAttempts = 0;
+  const unavailableBackend = Service.createApiAdapter(config, {fetch: async () => { unavailableAttempts++; return response(503, {}); }});
+  let serverUnavailable = false; try { await unavailableBackend.getPatient('P1'); } catch (e) { serverUnavailable = e.code === 'SERVER_ERROR'; } assert(serverUnavailable); assert.equal(unavailableAttempts, 3);
+  const noAccess = Service.createApiAdapter(config, {fetch: async () => response(403, {})});
+  let forbidden = false; try { await noAccess.getPatient('P1'); } catch (e) { forbidden = e.code === 'FORBIDDEN'; } assert(forbidden);
+  const conflict = Service.createApiAdapter(config, {fetch: async () => response(409, {})});
+  let conflicted = false; try { await conflict.updateExam('E1', {patientId: 'P1', rmeVisitId: 'V1'}); } catch (e) { conflicted = e.code === 'CONFLICT'; } assert(conflicted);
+  let attempts = 0;
+  const offline = Service.createApiAdapter(config, {fetch: async () => { attempts++; throw new Error('offline'); }});
+  let network = false; try { await offline.getPatient('P1'); } catch (e) { network = e.code === 'NETWORK_ERROR'; } assert(network); assert.equal(attempts, 3);
+  let failedWriteAttempts = 0;
+  const failedWrite = Service.createApiAdapter(config, {fetch: async () => { failedWriteAttempts++; throw new Error('write unavailable'); }});
+  let writeFailed = false; try { await failedWrite.createExam({patientId: 'P1', rmeVisitId: 'V2'}); } catch (e) { writeFailed = e.code === 'NETWORK_ERROR'; } assert(writeFailed); assert.equal(failedWriteAttempts, 1, 'writes are never automatically retried');
+  const missingProvenance = Service.createApiAdapter(config, {fetch: async () => response(201, {data: {id: 'E2', patientId: 'P1', rmeVisitId: 'V2'}})});
+  let provenanceFailed = false; try { await missingProvenance.createExam({patientId: 'P1', rmeVisitId: 'V2'}); } catch (e) { provenanceFailed = e.code === 'PROVENANCE_MISSING'; } assert(provenanceFailed);
+  const visitRequired = Service.createApiAdapter({...config, visitRequired: true}, {fetch: fetchMock});
+  let visitMissing = false; try { await visitRequired.createExam({patientId: 'P1', examDate: '2026-01-01'}); } catch (e) { visitMissing = e.code === 'VALIDATION_ERROR'; } assert(visitMissing);
+  const wrongLink = Service.createApiAdapter(config, {fetch: async () => response(201, {data: {id: 'E2', patientId: 'P2', rmeVisitId: 'V2', anthropometryCalculation: {algorithmVersion: 'engine-test', referenceSchemaVersion: 'schema-test', calculatedAt: '2026-10-09T00:00:00.000Z', results: []}}})});
+  let integrity = false; try { await wrongLink.createExam({patientId: 'P1', rmeVisitId: 'V2'}); } catch (e) { integrity = e.code === 'DATA_INTEGRITY_ERROR'; } assert(integrity);
+  const demo = {mode: 'simulation', persistenceMode: 'localStorage'};
+  assert.strictEqual(Service.createConfiguredService({demoAdapter: demo}), demo, 'no backend config must stay in explicit demo mode');
+  const misconfigured = Service.createConfiguredService({demoAdapter: demo, config: {enabled: true, baseUrl: '/api', routes: {}}});
+  let configFailure = false; try { await misconfigured.initialize(); } catch (e) { configFailure = e.code === 'CONFIGURATION_ERROR'; } assert(configFailure); assert.equal(misconfigured.mode, 'production', 'misconfigured production must not silently fall back to demo');
+  console.log('PASS API profile fetch, patient-filtered history, and linked exam create');
+  console.log('PASS patient/exam 404, 403 access denial, 409 conflict, and bounded network/server retries');
+  console.log('PASS required visit ID, patient/visit relation integrity, and result provenance checks');
+  console.log('PASS failed writes are not retried and missing provenance is not reported as success');
+  console.log('PASS same-origin cookie auth; no frontend Authorization token');
+  console.log('PASS no backend config stays demo; invalid production config fails closed');
+})().catch(e => { console.error(e); process.exit(1); });
