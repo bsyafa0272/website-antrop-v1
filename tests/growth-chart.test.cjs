@@ -4,7 +4,7 @@ const ctx={Date,Math,JSON,Set,Map,Array,String,Number,Object,RegExp,Error,Intl};
 for(const f of ['js/anthropometry.js','js/growth-reference-data.js','js/growth-engine.js','js/growth-chart.js'])vm.runInContext(fs.readFileSync(path.join(root,f),'utf8'),ctx,{filename:f});
 const chart=ctx.PediatricGrowthChart,engine=ctx.PediatricGrowthEngine,refs=ctx.GrowthReferenceData;
 const p={id:'SYN-P-1',birthDate:'2022-01-01',sexAtBirth:'female',isDemo:true};
-const exam=(id,date,weight,height=90,more={})=>({id,patientId:p.id,examDate:date,weightKg:weight,lengthHeightCm:height,measurementType:'standing_height',dataValidationStatus:'valid',createdAt:`${date}T12:00:00Z`,isDemo:true,...more});
+const exam=(id,date,weight,height=90,more={})=>({id,patientId:p.id,examDate:date,weightKg:weight,lengthHeightCm:height,measurementType:'standing_height',edemaStatus:'absent',dataValidationStatus:'valid',createdAt:`${date}T12:00:00Z`,isDemo:true,...more});
 const e1=exam('SYN-E-1','2023-01-01',9,75),e2=exam('SYN-E-2','2024-01-01',11,83),e3=exam('SYN-E-3','2025-01-01',13,91);
 let model=chart.buildModel({patient:p,exams:[],indexType:'weight_for_age',engine,referenceData:refs});
 assert.equal(model.status,'empty');assert(model.warnings.some(x=>x.includes('Belum ada riwayat')));assert(chart.renderSvg(model).includes('Belum cukup data'));

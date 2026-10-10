@@ -1,6 +1,6 @@
 # Pemantauan Antropometri Longitudinal Anak — Klinik Padjadjaran Jatinangor
 
-**Status: prototipe terintegrasi untuk pengujian alur; bukan aplikasi klinis produksi.** Paket saat ini memakai data sintetis/demo kecuali pengelola mengonfigurasi API RME yang benar. Dataset LMS WHO resmi dan benchmark independen belum dipasang, sehingga Z-score, kategori antropometri, dan kurva rujukan klinis sengaja tidak diaktifkan.
+**Status: prototipe terintegrasi untuk pengujian alur; bukan aplikasi klinis produksi.** Paket membundel tabel LMS WHO dari paket `anthro` 1.1.0 dan `anthroplus` 1.1.0. Z-score dihitung otomatis di browser untuk indeks yang didukung; hasil belum divalidasi untuk keputusan klinis atau deployment RME produksi. Aplikasi demo tetap memakai data sintetis.
 
 ## 1. Deskripsi aplikasi
 
@@ -12,7 +12,7 @@ Halaman utama:
 - **Daftar Pasien / Profil Pasien** — identitas, tanggal lahir, dan riwayat.
 - **Pemeriksaan Baru / Detail Pemeriksaan** — tanggal pemeriksaan, usia otomatis, pengukuran, validasi, dan koreksi.
 - **Riwayat Pemeriksaan** — daftar catatan dengan relasi pasien.
-- **Kurva Pertumbuhan** — titik longitudinal dari riwayat yang tersimpan, pemilihan indeks, detail titik, cetak, dan ekspor CSV.
+- **Kurva Pertumbuhan** — kurva WHO LMS dan titik longitudinal dari riwayat pasien, pemilihan indeks, detail titik, cetak, dan ekspor CSV. Pada formulir pemeriksaan, kurva dan interpretasi ikut diperbarui saat nilai ukur diketik.
 - **Ringkasan Laporan** — ringkasan jumlah catatan; bukan laporan klinis tervalidasi.
 - **Jejak Perubahan** — audit lokal demo atau peristiwa yang disediakan backend bila API mendukungnya.
 
@@ -31,7 +31,8 @@ pediatric-anthropometry/
 ├── css/styles.css                   # Tata letak dan responsivitas
 ├── js/data.js                       # Fixture sintetis (4 pasien, 6 pemeriksaan)
 ├── js/anthropometry.js              # Utilitas tanggal, usia, label, escaping
-├── js/growth-reference-data.js      # Registry standar/dataset dan gerbang aktivasi
+├── js/growth-reference-data.js      # Registry standar, indeks, dan validasi provenance
+├── js/growth-reference-datasets.js  # Tabel LMS WHO offline, dibuat dari sumber RDA
 ├── js/growth-engine.js              # Rumus, validasi, cakupan indeks, LMS
 ├── js/growth-chart.js               # Model, plot SVG, ekspor CSV
 ├── js/repository.js                 # Repository demo, validasi, audit lokal
@@ -39,6 +40,8 @@ pediatric-anthropometry/
 ├── js/app.js                        # Halaman, interaksi, formulir, status layanan
 ├── data/references/manifest.json    # Versi/status dataset, hash dan benchmark
 ├── data/references/README.md        # Petunjuk dataset rujukan
+├── data/references/source/          # Data WHO RDA asli dan lisensi GPL
+├── tools/build_who_reference_bundle.py # Pembuat bundle LMS browser
 ├── docs/ANTHROPOMETRY-STANDARDS.md  # Sumber standar, algoritme, gerbang klinis
 ├── docs/RME-INTEGRATION-CONTRACT.md # Kontrak dan kebutuhan backend
 └── tests/                           # Pengujian usia, mesin, grafik, data, UI
@@ -94,9 +97,9 @@ Sumber yang didokumentasikan dalam `docs/ANTHROPOMETRY-STANDARDS.md` dan `data/r
 1. WHO Child Growth Standards (2006): <https://www.who.int/tools/child-growth-standards>
 2. Perangkat lunak dan paket R WHO `anthro`: <https://www.who.int/toolkits/child-growth-standards/software>
 3. WHO Growth Reference 2007 untuk usia 5–19 tahun dan alat AnthroPlus: <https://www.who.int/tools/growth-reference-data-for-5to19-years/application-tools>
-4. Permenkes RI Nomor 2 Tahun 2020 tentang Standar Antropometri Anak: <https://jdih.kemkes.go.id/storage/documents/pdfs/2020permenkes002.pdf>
+4. Permenkes RI Nomor 2 Tahun 2020 tentang Standar Antropometri Anak: <https://jdih.kemkes.go.id/documents/peraturan-menteri-kesehatan-nomor-2-tahun-2020>
 
-Daftar tersebut menyatakan rujukan yang direncanakan, **bukan** bahwa dataset atau hasil algoritme sudah divalidasi. File LMS resmi belum dibundel; lisensi dataset, hash SHA-256, dan benchmark independen terhadap WHO Anthro/AnthroPlus belum lengkap. Lihat manifest untuk status terbaru.
+Tabel LMS diekstrak dari file data dalam paket WHO `anthro` 1.1.0 dan `anthroplus` 1.1.0; versi, lisensi GPL, provenance, hash, dan cakupan dicatat di [manifest](data/references/manifest.json). Bundle aktif untuk kalkulasi prototipe dan mencocokkan contoh WHO Anthro serta fixture uji WHO AnthroPlus; perbandingan penuh lintas versi dan validasi klinis formal masih diperlukan sebelum produksi. JDIH Kemenkes mencantumkan Permenkes 2/2020 berstatus berlaku.
 
 ## 8. Ringkasan algoritme
 
@@ -104,16 +107,17 @@ Daftar tersebut menyatakan rujukan yang direncanakan, **bukan** bahwa dataset at
 - Usia kalender diturunkan dari tanggal lahir dan tanggal pemeriksaan; usia dalam hari serta usia bulan algoritmik digunakan sesuai kebutuhan indeks.
 - IMT mentah dihitung sebagai `berat_kg / (tinggi_cm / 100)^2` jika kedua nilai valid. IMT mentah bukan kategori IMT/U.
 - Koreksi panjang/tinggi 0,7 cm tersedia mengikuti konvensi WHO (di bawah 24 bulan, tinggi berdiri dikonversi ke panjang telentang; mulai 24 bulan, panjang telentang dikonversi ke tinggi berdiri) dan memerlukan jenis pengukuran yang dicatat.
-- Mesin menyediakan formula LMS, interpolasi antar titik yang tersedia, koreksi ekstrem, batas cakupan usia, dan pemblokiran ekstrapolasi. Namun perhitungan Z-score klinis dinonaktifkan karena dataset resmi yang diverifikasi dan benchmark independen belum tersedia. Karena itu kategori dan kurva rujukan tidak boleh dianggap hasil klinis.
+- Mesin menggunakan formula LMS WHO, interpolasi di dalam cakupan tabel, koreksi ekor ekstrem sesuai tiap indeks, koreksi posisi panjang/tinggi WHO dengan batas 731 hari, serta menolak ekstrapolasi. Z-score dihitung untuk BB/U, PB/TB/U, BB/PB/TB, IMT/U, LK/U, dan LiLA/U pada 0–5 tahun; TB/U dan IMT/U 5–19 tahun; serta BB/U 5–10 tahun.
+- Interpretasi kategori di bawah 5 tahun menggunakan ambang Permenkes 2/2020 yang dikonfigurasi. BB/U WHO 2007, LK/U, dan LiLA/U menampilkan Z-score tanpa kategori otomatis. Status edema dicatat per pemeriksaan; indeks berbasis berat badan ditahan jika edema ditemukan atau belum dikonfirmasi.
 - Setiap snapshot perhitungan menyimpan versi algoritme/skema referensi, waktu hitung, status dataset, dan status tiap indeks. Hasil yang tidak valid/tidak dihitung tidak diberi kategori normal sebagai pengganti.
 
 ## 9. Batasan sistem
 
 - Ini adalah prototipe front-end; belum ada server klinik, database klinis, SSO, autentikasi, atau otorisasi yang disediakan oleh paket ini.
 - Data demo tidak nyata dan tidak boleh dicampur dengan data pasien sebenarnya.
-- Belum ada dataset LMS WHO yang terverifikasi, hash dataset, tinjauan lisensi dataset, atau benchmark independen; Z-score, kategori klinis, dan kurva referensi tetap nonaktif.
+- Bundle dan kalkulasi Z-score tersedia untuk prototipe; belum ada validasi klinis formal, pengujian keselamatan/privasi, atau persetujuan penggunaan klinis. Hasil tidak boleh menjadi satu-satunya dasar keputusan.
 - Validasi formulir sisi klien tidak menggantikan validasi backend atau SOP pengukuran. Rentang ekstrem hanya memicu verifikasi, bukan membuktikan kesalahan.
-- Usia koreksi prematur tidak diterapkan otomatis. LK/U dan LiLA/U tidak diberi kategori otomatis pada modul ini.
+- Usia koreksi prematur tidak dihitung otomatis. LK/U dan LiLA/U tidak diberi kategori otomatis pada modul ini.
 - Ringkasan laporan belum merupakan laporan klinis final; ekspor laporan PDF tidak tersedia. Ekspor CSV hanya untuk titik kurva yang dibentuk dari riwayat aplikasi.
 - Uji keamanan, privasi, usability dengan staf, integrasi terhadap lingkungan uji RME, pemulihan backup, dan validasi klinis belum dilakukan.
 

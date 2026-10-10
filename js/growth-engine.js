@@ -1,4 +1,4 @@
-/* Pure, UI-independent anthropometry engine. Clinical Z-scores require verified LMS datasets. */
+/* Pure, UI-independent anthropometry engine using the bundled WHO LMS datasets. */
 (function (root) {
   "use strict";
   const ALGORITHM_VERSION = "klinik-anthro-engine/0.1.0";
@@ -32,8 +32,9 @@
     if (!Number.isFinite(Number(valueCm)) || Number(valueCm)<=0) return {status:"failed_validation",valueCm:null,reason:"invalid_length_height"};
     if (!["recumbent_length","standing_height"].includes(measurementType)) return {status:"incomplete",valueCm:null,reason:"measurement_position_required"};
     if (!Number.isFinite(ageDays)||ageDays<0) return {status:"failed_validation",valueCm:null,reason:"valid_age_required"};
-    // WHO convention: <24 months convert standing height to length (+0.7 cm); >=24 months convert recumbent length to height (-0.7 cm).
-    const under24Months=Number.isFinite(completedMonths)?completedMonths<24:ageDays<730.5;
+    // WHO Anthro uses the 731-day boundary: age <731 days uses recumbent length;
+    // age >=731 days uses standing height, regardless of the entered position.
+    const under24Months=ageDays<731;
     if (under24Months && measurementType === "standing_height") return {status:"calculated",valueCm:Number(valueCm)+0.7,correctionCm:0.7,correctionApplied:true,reason:"standing_height_to_recumbent_length"};
     if (!under24Months && measurementType === "recumbent_length") return {status:"calculated",valueCm:Number(valueCm)-0.7,correctionCm:-0.7,correctionApplied:true,reason:"recumbent_length_to_standing_height"};
     return {status:"calculated",valueCm:Number(valueCm),correctionCm:0,correctionApplied:false,reason:null};
@@ -115,8 +116,11 @@
     const standard=registry().standards[def.standard];
     const base={indexType,label:def.label,unit:def.unit,standardId:def.standard,referenceStandardVersion:standard.version,datasetVersion:standard.datasetVersion,algorithmVersion:ALGORITHM_VERSION,referenceSchemaVersion:REFERENCE_SCHEMA_VERSION,zScore:null,category:null,threshold:null,calculatedValue:null,validityStatus:"not_calculated",reason:null};
     if (!age.valid) return {...base,validityStatus:"failed_validation",reason:age.reason};
-    if (age.completedMonths<def.minAgeMonths || age.completedMonths>def.maxAgeMonths) return {...base,validityStatus:"not_applicable",reason:"age_outside_index_scope"};
+    if (age.ageMonths<def.minAgeMonths || age.ageMonths>=def.maxAgeMonthsExclusive) return {...base,validityStatus:"not_applicable",reason:"age_outside_index_scope"};
     if (!patient || !["male","female"].includes(patient.sexAtBirth)) return {...base,validityStatus:"incomplete",reason:"sex_missing_or_invalid"};
+    const weightRelated=["weight_for_age","weight_for_age_5_10","weight_for_length_height","bmi_for_age_under5","bmi_for_age_5_19"].includes(indexType);
+    const edemaStatus=["absent","present"].includes(exam?.edemaStatus)?exam.edemaStatus:"unknown";
+    if (weightRelated && edemaStatus!=="absent") return {...base,validityStatus:"not_calculated",reason:edemaStatus==="present"?"edema_present_weight_based_index_withheld":"edema_status_unknown_weight_based_index_withheld"};
     const inputValues={...exam};
     const corrected=exam.lengthHeightCm===null||exam.lengthHeightCm===undefined||exam.lengthHeightCm===""?null:correctLengthHeight(exam.lengthHeightCm,exam.measurementType,age.ageDays,age.completedMonths);
     if (corrected?.status==="failed_validation") return {...base,validityStatus:"failed_validation",reason:corrected.reason};
@@ -125,8 +129,9 @@
     inputValues.bmi=bmi.value;
     const missing=def.required.filter(key=>inputValues[key]===null||inputValues[key]===undefined||inputValues[key]===""||(key==="bmi"&&bmi.status!=="calculated"));
     if (missing.length) return {...base,validityStatus:"incomplete",reason:`missing_required_input:${missing.join(",")}`};
-    const dataset=registry().getDataset(def.standard,indexType,patient.sexAtBirth);
-    if (!dataset) return {...base,validityStatus:"not_calculated",reason:"verified_reference_dataset_not_loaded",datasetStatus:standard.datasetStatus};
+    const datasetMeasure= indexType==="weight_for_length_height" ? (age.ageDays<731?"recumbent_length":"standing_height") : null;
+    const dataset=registry().getDataset(def.standard,indexType,patient.sexAtBirth,datasetMeasure);
+    if (!dataset) return {...base,validityStatus:"not_calculated",reason:"verified_reference_dataset_not_loaded",datasetStatus:registry().datasetStatus(def.standard)};
     const axis=def.referenceAxis==="ageDays"?age.ageDays:def.referenceAxis==="ageMonths"?age.ageMonths:inputValues.correctedLengthHeightCm;
     const found=interpolateLMS(dataset,axis);
     if (found.status!=="available") return {...base,validityStatus:found.status,reason:found.reason};
@@ -134,7 +139,9 @@
     const measured=valueKey==="bmi"?bmi.value:valueKey==="lengthHeightCm"?inputValues.correctedLengthHeightCm:inputValues[valueKey];
     const z=lmsZScore(measured,found.lms.L,found.lms.M,found.lms.S,{extremeCorrection:dataset.extremeCorrection!==false});
     if (z.status!=="calculated") return {...base,validityStatus:z.status,reason:z.reason,calculatedValue:measured};
-    const classified=classifyZScore(indexType,z.zScore);
+    const classified=indexType==="bmi_for_age_5_19"&&age.ageMonths>=228
+      ? {category:null,threshold:null,status:"clinical_review_required",note:"Ambang kategori Permenkes berlaku sampai usia 18 tahun; usia 19 tahun memerlukan tinjauan kebijakan."}
+      : classifyZScore(indexType,z.zScore);
     return {...base,calculatedValue:measured,zScore:z.zScore,category:classified.category,threshold:classified.threshold,validityStatus:"valid",interpretationStatus:classified.status==="classified"?"classified":"clinical_review_required",reason:classified.note||null,datasetVersion:dataset.datasetVersion,referenceSource:dataset.sourceUrl||standard.sourceUrl,calculationDetails:{axis,axisUnit:def.referenceAxis==="ageDays"?"days":def.referenceAxis==="ageMonths"?"months":"cm",lms:found.lms,rawZScore:z.rawZScore,extremeCorrectionApplied:z.extremeCorrectionApplied,measurementCorrection:corrected?.correctionCm??0}};
   }
   function evaluateExam(patient, exam) {
@@ -142,14 +149,13 @@
     const bmi=calculateBMI(exam?.weightKg,exam?.lengthHeightCm);
     const ranges=[["weightKg",0.1,300],["lengthHeightCm",20,250],["headCircumferenceCm",10,100],["midUpperArmCircumferenceCm",3,80]];
     const invalid=ranges.filter(([key,min,max])=>exam?.[key]!==null&&exam?.[key]!==undefined&&exam?.[key]!==""&&(!Number.isFinite(Number(exam[key]))||Number(exam[key])<min||Number(exam[key])>max));
-    if (!age.valid || invalid.length || !patient || !["male","female"].includes(patient.sexAtBirth)) {
-      const reason=!age.valid?age.reason:invalid.length?`measurement_out_of_range:${invalid.map(x=>x[0]).join(",")}`:"sex_missing_or_invalid";
+    const invalidEdemaStatus=exam?.edemaStatus!==undefined&&! ["unknown","absent","present"].includes(exam.edemaStatus);
+    if (!age.valid || invalid.length || invalidEdemaStatus || !patient || !["male","female"].includes(patient.sexAtBirth)) {
+      const reason=!age.valid?age.reason:invalid.length?`measurement_out_of_range:${invalid.map(x=>x[0]).join(",")}`:invalidEdemaStatus?"edema_status_invalid":"sex_missing_or_invalid";
       return {algorithmVersion:ALGORITHM_VERSION,referenceSchemaVersion:REFERENCE_SCHEMA_VERSION,age,bmi,overallStatus:"failed_validation",validationErrors:[reason],results:Object.keys(registry().indexDefinitions).map(key=>({...evaluateIndex(key,patient,exam,age),validityStatus:"failed_validation",zScore:null,category:null,threshold:null,reason}))};
     }
     const results=[];
-    const indexList=age.completedMonths<=60
-      ? ["weight_for_age","height_for_age_under5","weight_for_length_height","bmi_for_age_under5","head_circumference_for_age","muac_for_age","height_for_age_5_19","bmi_for_age_5_19"]
-      : ["weight_for_age","height_for_age_under5","weight_for_length_height","bmi_for_age_under5","head_circumference_for_age","muac_for_age","height_for_age_5_19","bmi_for_age_5_19"];
+    const indexList=["weight_for_age","weight_for_age_5_10","height_for_age_under5","weight_for_length_height","bmi_for_age_under5","head_circumference_for_age","muac_for_age","height_for_age_5_19","bmi_for_age_5_19"];
     for (const indexType of indexList) results.push(evaluateIndex(indexType,patient,exam,age));
     return {algorithmVersion:ALGORITHM_VERSION,referenceSchemaVersion:REFERENCE_SCHEMA_VERSION,age,bmi,results,overallStatus:results.some(r=>r.validityStatus==="valid")?"partial":results.every(r=>["not_applicable","not_calculated"].includes(r.validityStatus))?"not_calculated":"review_required"};
   }

@@ -1,7 +1,6 @@
 /*
- * Registry metadata only. No reference curve/LMS values are bundled because the
- * authoritative data files have not yet been imported and independently checked.
- * The engine must fail closed until a verified dataset is registered.
+ * WHO LMS data is loaded by growth-reference-datasets.js. Dataset activation
+ * remains explicit and fails closed if a bundle is absent or rejected.
  */
 (function (root) {
   "use strict";
@@ -20,14 +19,15 @@
     })
   });
   const indexDefinitions = Object.freeze({
-    weight_for_age: {label:"Berat badan menurut umur (BB/U)", unit:"kg", required:["weightKg"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonths:60, referenceAxis:"ageDays", thresholdSet:"weight_for_age_under5"},
-    height_for_age_under5: {label:"Panjang/tinggi badan menurut umur (PB/U atau TB/U)", unit:"cm", required:["lengthHeightCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonths:60, referenceAxis:"ageDays", thresholdSet:"height_for_age"},
-    weight_for_length_height: {label:"Berat badan menurut panjang/tinggi badan (BB/PB atau BB/TB)", unit:"kg", required:["weightKg","lengthHeightCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonths:60, referenceAxis:"lengthHeightCm", thresholdSet:"weight_for_length_height"},
-    bmi_for_age_under5: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", required:["bmi"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonths:60, referenceAxis:"ageDays", thresholdSet:"bmi_for_age_under5"},
-    head_circumference_for_age: {label:"Lingkar kepala menurut umur (LK/U)", unit:"cm", required:["headCircumferenceCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonths:60, referenceAxis:"ageDays", thresholdSet:null},
-    muac_for_age: {label:"Lingkar lengan atas menurut umur (LiLA/U)", unit:"cm", required:["midUpperArmCircumferenceCm"], standard:"WHO_CGS_2006", minAgeMonths:3, maxAgeMonths:60, referenceAxis:"ageDays", thresholdSet:null},
-    height_for_age_5_19: {label:"Tinggi badan menurut umur (TB/U)", unit:"cm", required:["lengthHeightCm"], standard:"WHO_GGR_2007", minAgeMonths:61, maxAgeMonths:228, referenceAxis:"ageMonths", thresholdSet:"height_for_age"},
-    bmi_for_age_5_19: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", required:["bmi"], standard:"WHO_GGR_2007", minAgeMonths:61, maxAgeMonths:228, referenceAxis:"ageMonths", thresholdSet:"bmi_for_age_5_19"}
+    weight_for_age: {label:"Berat badan menurut umur (BB/U)", unit:"kg", required:["weightKg"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonthsExclusive:60, referenceAxis:"ageDays", thresholdSet:"weight_for_age_under5"},
+    weight_for_age_5_10: {label:"Berat badan menurut umur (BB/U, 5–10 tahun)", unit:"kg", required:["weightKg"], standard:"WHO_GGR_2007", minAgeMonths:60, maxAgeMonthsExclusive:121, referenceAxis:"ageMonths", thresholdSet:null},
+    height_for_age_under5: {label:"Panjang/tinggi badan menurut umur (PB/U atau TB/U)", unit:"cm", required:["lengthHeightCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonthsExclusive:60, referenceAxis:"ageDays", thresholdSet:"height_for_age"},
+    weight_for_length_height: {label:"Berat badan menurut panjang/tinggi badan (BB/PB atau BB/TB)", unit:"kg", required:["weightKg","lengthHeightCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonthsExclusive:60, referenceAxis:"lengthHeightCm", thresholdSet:"weight_for_length_height"},
+    bmi_for_age_under5: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", required:["bmi"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonthsExclusive:60, referenceAxis:"ageDays", thresholdSet:"bmi_for_age_under5"},
+    head_circumference_for_age: {label:"Lingkar kepala menurut umur (LK/U)", unit:"cm", required:["headCircumferenceCm"], standard:"WHO_CGS_2006", minAgeMonths:0, maxAgeMonthsExclusive:60, referenceAxis:"ageDays", thresholdSet:null},
+    muac_for_age: {label:"Lingkar lengan atas menurut umur (LiLA/U)", unit:"cm", required:["midUpperArmCircumferenceCm"], standard:"WHO_CGS_2006", minAgeMonths:3, maxAgeMonthsExclusive:60, referenceAxis:"ageDays", thresholdSet:null},
+    height_for_age_5_19: {label:"Tinggi badan menurut umur (TB/U)", unit:"cm", required:["lengthHeightCm"], standard:"WHO_GGR_2007", minAgeMonths:60, maxAgeMonthsExclusive:229, referenceAxis:"ageMonths", thresholdSet:null},
+    bmi_for_age_5_19: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", required:["bmi"], standard:"WHO_GGR_2007", minAgeMonths:60, maxAgeMonthsExclusive:229, referenceAxis:"ageMonths", thresholdSet:"bmi_for_age_5_19"}
   });
   const registry = new Map();
   function registerDataset(dataset) {
@@ -44,15 +44,28 @@
     if (!Object.hasOwn(indexDefinitions, dataset.indexType)) throw new TypeError("Jenis indeks tidak dikenal.");
     if (!Object.hasOwn(standards, dataset.standardId)) throw new TypeError("Standar rujukan tidak dikenal.");
     if (!["male","female"].includes(dataset.sex)) throw new TypeError("Jenis kelamin dataset tidak dikenal.");
+    if (dataset.indexType==="weight_for_length_height" && !["recumbent_length","standing_height"].includes(dataset.measurementType)) throw new TypeError("Tabel BB/PB atau BB/TB wajib menyatakan posisi standar.");
+    if (dataset.indexType!=="weight_for_length_height" && dataset.measurementType) throw new TypeError("Posisi ukur hanya boleh menjadi dimensi tabel BB/PB atau BB/TB.");
     const sorted=[...dataset.rows].sort((a,b)=>a.axis-b.axis);
     for (let i=0;i<sorted.length;i++) {
       const row=sorted[i];
       if (![row.axis, row.L, row.M, row.S].every(Number.isFinite) || row.M <= 0 || row.S <= 0) throw new TypeError("Baris LMS tidak valid.");
       if (i>0 && sorted[i-1].axis===row.axis) throw new TypeError("Sumbu referensi duplikat.");
     }
-    const key = `${dataset.standardId}:${dataset.indexType}:${dataset.sex}`;
+    const key = `${dataset.standardId}:${dataset.indexType}:${dataset.sex}:${dataset.measurementType||""}`;
     registry.set(key, Object.freeze({...dataset, rows:sorted}));
   }
-  function getDataset(standardId, indexType, sex) { return registry.get(`${standardId}:${indexType}:${sex}`) || null; }
-  root.GrowthReferenceData = {standards, indexDefinitions, registerDataset, getDataset, datasetCount:()=>registry.size};
+  const datasetStatuses={WHO_CGS_2006:"unavailable",WHO_GGR_2007:"unavailable"};
+  function setDatasetStatus(statuses) {
+    for (const [id,value] of Object.entries(statuses||{})) {
+      if (!Object.hasOwn(standards,id) || !["available","unavailable"].includes(value)) throw new TypeError("Status dataset standar tidak valid.");
+      if (value==="available" && ![...registry.values()].some(item=>item.standardId===id)) throw new TypeError("Standar tidak dapat diaktifkan tanpa tabel LMS terdaftar.");
+      datasetStatuses[id]=value;
+    }
+  }
+  function getDataset(standardId, indexType, sex, measurementType=null) {
+    return registry.get(`${standardId}:${indexType}:${sex}:${measurementType||""}`) ||
+      (measurementType?null:registry.get(`${standardId}:${indexType}:${sex}:`)) || null;
+  }
+  root.GrowthReferenceData = {standards, indexDefinitions, registerDataset, getDataset, setDatasetStatus, datasetStatus:id=>datasetStatuses[id]||"unavailable", datasetCount:()=>registry.size};
 })(typeof window !== "undefined" ? window : globalThis);

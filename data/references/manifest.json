@@ -1,8 +1,22 @@
 {
-  "manifestVersion": "1.0.0",
-  "status": "blocked_pending_official_data_and_independent_benchmarks",
-  "clinicalZScoresEnabled": false,
-  "lastReviewed": "2026-10-09",
+  "manifestVersion": "1.1.0",
+  "status": "who_lms_bundled; software_and_clinical_validation_required_before_production",
+  "zScoreCalculationsEnabled": true,
+  "clinicalCategoriesEnabled": true,
+  "productionClinicalUseApproved": false,
+  "lastReviewed": "2026-10-10",
+  "bundle": {
+    "path": "js/growth-reference-datasets.js",
+    "sha256": "d9e782e9212d18c4729a8da19cf31166bee1afe6a4d6b203680592c1de22b66a",
+    "generatedBy": "tools/build_who_reference_bundle.py",
+    "dataEncoding": "LMS rows [axis,L,M,S], embedded for offline browser use"
+  },
+  "benchmarks": {
+    "path": "data/references/benchmarks.json",
+    "status": "representative_examples_match_at_2dp; full_clinical_benchmark_still_required",
+    "coverage": "WHO Anthro README vectors for WFA/HFA/WFL-H/BMI-U; WHO AnthroPlus test vectors for WFA/HFA/BMI-U",
+    "fullCrossVersionClinicalValidation": "pending"
+  },
   "standards": [
     {
       "id": "WHO_CGS_2006",
@@ -10,14 +24,22 @@
       "version": "2006",
       "officialSource": "https://www.who.int/tools/child-growth-standards",
       "algorithmSource": "https://www.who.int/toolkits/child-growth-standards/software",
-      "algorithmPackage": "WHO anthro R package 1.1.0",
+      "algorithmPackage": "WHO anthro 1.1.0",
       "algorithmLicense": "GPL-3",
-      "datasetFiles": [],
-      "datasetVersion": null,
-      "sha256": null,
-      "datasetLicenseReviewed": false,
-      "independentBenchmarkStatus": "not_run",
-      "clinicalActivation": "disabled"
+      "packageSource": "https://cran.r-project.org/src/contrib/anthro_1.1.0.tar.gz",
+      "packageSha256": "191672c4fa15ee0089eba241837c8d8dd95b52a5b94c2110d87ce15c84a8cce7",
+      "sourceDataFile": "data/references/source/anthro-1.1.0-sysdata.rda",
+      "sourceDataSha256": "e021d51a1e95237e141d7c85382887997d62c8ccd092a791c8fad003d7a5e7c7",
+      "datasetVersion": "1.1.0",
+      "indices": [
+        "weight_for_age", "height_for_age_under5", "weight_for_length_height",
+        "bmi_for_age_under5", "head_circumference_for_age", "muac_for_age"
+      ],
+      "sexes": ["male", "female"],
+      "datasetLicenseReviewed": true,
+      "licenseNotice": "data/references/source/licenses/GPL-3.0-anthro.md",
+      "benchmarkStatus": "matched to published WHO anthro 1.1.0 z-score example at 2-decimal precision for WFA, HFA, WFL/H, and BMI-for-age",
+      "clinicalActivation": "enabled_in_prototype"
     },
     {
       "id": "WHO_GGR_2007",
@@ -25,20 +47,26 @@
       "version": "2007",
       "officialSource": "https://www.who.int/tools/growth-reference-data-for-5to19-years",
       "algorithmSource": "https://www.who.int/tools/growth-reference-data-for-5to19-years/application-tools",
-      "algorithmPackage": "WHO anthroplus R package 1.1.0",
+      "algorithmPackage": "WHO anthroplus 1.1.0",
       "algorithmLicense": "GPL-3-or-later",
-      "datasetFiles": [],
-      "datasetVersion": null,
-      "sha256": null,
-      "datasetLicenseReviewed": false,
-      "independentBenchmarkStatus": "not_run",
-      "clinicalActivation": "disabled"
+      "packageSource": "https://cran.r-project.org/src/contrib/anthroplus_1.1.0.tar.gz",
+      "packageSha256": "42fc2b90eb3a291669d02b10c6dbdf033a315dd55df1df481211255de0b1c798",
+      "sourceDataFile": "data/references/source/anthroplus-1.1.0-sysdata.rda",
+      "sourceDataSha256": "ca09deabdf3ba3b6acc9d120f0603d9b36ca883528653e05ff1117cfb365ac34",
+      "datasetVersion": "1.1.0",
+      "indices": ["weight_for_age_5_10", "height_for_age_5_19", "bmi_for_age_5_19"],
+      "sexes": ["male", "female"],
+      "datasetLicenseReviewed": true,
+      "licenseNotice": "data/references/source/licenses/GPL-3.0-anthro.md",
+      "benchmarkStatus": "representative WHO AnthroPlus package examples and retained test fixture vectors matched at 2-decimal precision; full cross-version comparison still required",
+      "clinicalActivation": "enabled_in_prototype"
     }
   ],
   "nationalInterpretation": {
     "name": "Permenkes RI Nomor 2 Tahun 2020 tentang Standar Antropometri Anak",
-    "source": "https://jdih.kemkes.go.id/storage/documents/pdfs/2020permenkes002.pdf",
-    "statusChecked": "2026-10-09",
-    "status": "listed_as_in_force_on_government_legal_database"
+    "source": "https://jdih.kemkes.go.id/documents/peraturan-menteri-kesehatan-nomor-2-tahun-2020",
+    "statusChecked": "2026-10-10",
+    "status": "in_force",
+    "statusSource": "https://jdih.kemkes.go.id/documents/peraturan-menteri-kesehatan-nomor-2-tahun-2020"
   }
 }

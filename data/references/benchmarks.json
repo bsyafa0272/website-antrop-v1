@@ -1,0 +1,27 @@
+{
+  "benchmarkVersion": "1.0.0",
+  "precision": "z-scores rounded to 2 decimal places, matching WHO package output",
+  "whoAnthroReadmeExample": {
+    "source": "https://github.com/WorldHealthOrganization/anthro/blob/master/README.md",
+    "inputs": [
+      {"sex":"male","ageDays":1001,"weightKg":18,"lengthHeightCm":120,"measurementType":"standing_height","expected":{"weight_for_age":2.20,"height_for_age_under5":7.31,"weight_for_length_height":-2.39,"bmi_for_age_under5":-3.01}},
+      {"sex":"female","ageDays":1000,"weightKg":15,"lengthHeightCm":80,"measurementType":"standing_height","expected":{"weight_for_age":0.95,"height_for_age_under5":-3.50,"weight_for_length_height":4.13,"bmi_for_age_under5":4.66}},
+      {"sex":"male","ageDays":1010,"weightKg":10,"lengthHeightCm":100,"measurementType":"standing_height","expected":{"weight_for_age":-2.76,"height_for_age_under5":1.62,"weight_for_length_height":-5.19,"bmi_for_age_under5":-5.61}},
+      {"sex":"male","ageDays":1000,"weightKg":15,"lengthHeightCm":100,"measurementType":"standing_height","expected":{"weight_for_age":0.69,"height_for_age_under5":1.70,"weight_for_length_height":-0.29,"bmi_for_age_under5":-0.58}}
+    ]
+  },
+  "whoAnthroplusTests": {
+    "source": "https://github.com/WorldHealthOrganization/anthroplus/blob/master/tests/testthat/test-zscores.R",
+    "boundaryInputs": [
+      {"sex":"female","ageMonths":60.32,"weightKg":18.7,"heightCm":113.8,"expected":{"weight_for_age_5_10":0.21,"bmi_for_age_5_19":-0.58,"height_for_age_5_19":0.96}},
+      {"sex":"female","ageMonths":60.911701,"weightKg":20.5,"heightCm":113.6,"expected":{"weight_for_age_5_10":0.79,"bmi_for_age_5_19":0.42,"height_for_age_5_19":0.85}}
+    ],
+    "fixtureCases": [
+      {"sex":"male","ageMonths":166.59,"weightKg":50.7,"heightCm":153.7,"expected":{"height_for_age_5_19":-1.13,"bmi_for_age_5_19":0.94}},
+      {"sex":"male","ageMonths":184.09,"weightKg":84.6,"heightCm":181.7,"expected":{"height_for_age_5_19":1.43,"bmi_for_age_5_19":1.66}},
+      {"sex":"male","ageMonths":172.42,"weightKg":76.7,"heightCm":166.6,"expected":{"height_for_age_5_19":0.14,"bmi_for_age_5_19":2.23}},
+      {"sex":"female","ageMonths":133.88,"weightKg":46.5,"heightCm":144.3,"expected":{"height_for_age_5_19":-0.25,"bmi_for_age_5_19":1.65}},
+      {"sex":"male","ageMonths":188.57,"weightKg":126.4,"heightCm":171.4,"expected":{"height_for_age_5_19":-0.07,"bmi_for_age_5_19":4.21}}
+    ]
+  }
+}

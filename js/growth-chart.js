@@ -3,15 +3,16 @@
   "use strict";
   const DAY_MONTH = 30.4375;
   const INDEXES = Object.freeze({
-    weight_for_age: {label:"Berat badan menurut umur (BB/U)", unit:"kg", minMonths:0, maxMonths:60, valueKey:"weightKg", refs:[{minMonths:0,maxMonths:60,standardId:"WHO_CGS_2006",indexType:"weight_for_age",axis:"ageDays"}]},
-    height_for_age: {label:"Panjang/tinggi badan menurut umur (PB/TB/U)", unit:"cm", minMonths:0, maxMonths:228, valueKey:"lengthHeightCm", refs:[{minMonths:0,maxMonths:60,standardId:"WHO_CGS_2006",indexType:"height_for_age_under5",axis:"ageDays"},{minMonths:61,maxMonths:228,standardId:"WHO_GGR_2007",indexType:"height_for_age_5_19",axis:"ageMonths"}]},
-    bmi_for_age: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", minMonths:0, maxMonths:228, valueKey:"bmi", refs:[{minMonths:0,maxMonths:60,standardId:"WHO_CGS_2006",indexType:"bmi_for_age_under5",axis:"ageDays"},{minMonths:61,maxMonths:228,standardId:"WHO_GGR_2007",indexType:"bmi_for_age_5_19",axis:"ageMonths"}]},
-    head_circumference_for_age: {label:"Lingkar kepala menurut umur (LK/U)", unit:"cm", minMonths:0, maxMonths:60, valueKey:"headCircumferenceCm", refs:[{minMonths:0,maxMonths:60,standardId:"WHO_CGS_2006",indexType:"head_circumference_for_age",axis:"ageDays"}]},
-    muac_for_age: {label:"Lingkar lengan atas menurut umur (LiLA/U)", unit:"cm", minMonths:3, maxMonths:60, valueKey:"midUpperArmCircumferenceCm", refs:[{minMonths:3,maxMonths:60,standardId:"WHO_CGS_2006",indexType:"muac_for_age",axis:"ageDays"}]}
+    weight_for_age: {label:"Berat badan menurut umur (BB/U)", unit:"kg", minMonths:0, maxMonthsExclusive:60, valueKey:"weightKg", refs:[{minMonths:0,maxMonthsExclusive:60,standardId:"WHO_CGS_2006",indexType:"weight_for_age",axis:"ageDays"}]},
+    weight_for_age_5_10: {label:"Berat badan menurut umur (BB/U, 5–10 tahun)", unit:"kg", minMonths:60, maxMonthsExclusive:121, valueKey:"weightKg", refs:[{minMonths:60,maxMonthsExclusive:121,standardId:"WHO_GGR_2007",indexType:"weight_for_age_5_10",axis:"ageMonths"}]},
+    height_for_age: {label:"Panjang/tinggi badan menurut umur (PB/TB/U)", unit:"cm", minMonths:0, maxMonthsExclusive:229, valueKey:"lengthHeightCm", refs:[{minMonths:0,maxMonthsExclusive:60,standardId:"WHO_CGS_2006",indexType:"height_for_age_under5",axis:"ageDays"},{minMonths:60,maxMonthsExclusive:229,standardId:"WHO_GGR_2007",indexType:"height_for_age_5_19",axis:"ageMonths"}]},
+    bmi_for_age: {label:"IMT menurut umur (IMT/U)", unit:"kg/m²", minMonths:0, maxMonthsExclusive:229, valueKey:"bmi", refs:[{minMonths:0,maxMonthsExclusive:60,standardId:"WHO_CGS_2006",indexType:"bmi_for_age_under5",axis:"ageDays"},{minMonths:60,maxMonthsExclusive:229,standardId:"WHO_GGR_2007",indexType:"bmi_for_age_5_19",axis:"ageMonths"}]},
+    head_circumference_for_age: {label:"Lingkar kepala menurut umur (LK/U)", unit:"cm", minMonths:0, maxMonthsExclusive:60, valueKey:"headCircumferenceCm", refs:[{minMonths:0,maxMonthsExclusive:60,standardId:"WHO_CGS_2006",indexType:"head_circumference_for_age",axis:"ageDays"}]},
+    muac_for_age: {label:"Lingkar lengan atas menurut umur (LiLA/U)", unit:"cm", minMonths:3, maxMonthsExclusive:60, valueKey:"midUpperArmCircumferenceCm", refs:[{minMonths:3,maxMonthsExclusive:60,standardId:"WHO_CGS_2006",indexType:"muac_for_age",axis:"ageDays"}]}
   });
 
   function referenceForAge(config, ageMonths) {
-    return config.refs.find(ref => ageMonths >= ref.minMonths && ageMonths <= ref.maxMonths) || null;
+    return config.refs.find(ref => ageMonths >= ref.minMonths && ageMonths < ref.maxMonthsExclusive) || null;
   }
   function availableIndexes(patient, exams, engine) {
     if (!patient) return [];
@@ -20,14 +21,14 @@
     const age = engine.getAge(patient.birthDate, referenceDate);
     if (!age.valid) return [];
     const months = age.ageMonths;
-    return Object.entries(INDEXES).filter(([,c]) => age.completedMonths >= c.minMonths && age.completedMonths <= c.maxMonths)
+    return Object.entries(INDEXES).filter(([,c]) => age.ageMonths >= c.minMonths && age.ageMonths < c.maxMonthsExclusive)
       .map(([value,c]) => ({value,label:c.label,unit:c.unit}));
   }
   function getRawValue(indexType, patient, exam, age, engine) {
     const cfg = INDEXES[indexType];
     if (!cfg) return {value:null,reason:"unknown_index"};
     const months=age.ageMonths;
-    if (age.completedMonths < cfg.minMonths || age.completedMonths > cfg.maxMonths || !referenceForAge(cfg,age.completedMonths)) return {value:null,reason:"outside_index_age_coverage"};
+    if (age.ageMonths < cfg.minMonths || age.ageMonths >= cfg.maxMonthsExclusive || !referenceForAge(cfg,age.ageMonths)) return {value:null,reason:"outside_index_age_coverage"};
     if (indexType === "weight_for_age") return Number.isFinite(Number(exam.weightKg)) && exam.weightKg!==null && exam.weightKg!=="" ? {value:Number(exam.weightKg)} : {value:null,reason:"missing_weight"};
     if (indexType === "height_for_age") {
       if (exam.lengthHeightCm===null || exam.lengthHeightCm===undefined || exam.lengthHeightCm==="") return {value:null,reason:"missing_length_height"};
@@ -54,8 +55,11 @@
       const age=engine.getAge(patient.birthDate,e.examDate);
       if(!age.valid){excluded.push({examId:e.id,date:e.examDate,reason:"invalid_exam_date_or_before_birth"});continue;}
       const months=age.ageMonths;
-      const ref=referenceForAge(cfg,age.completedMonths);
+      const ref=referenceForAge(cfg,age.ageMonths);
       if(!ref){excluded.push({examId:e.id,date:e.examDate,ageMonths:months,reason:"outside_reference_age_coverage"});continue;}
+      const weightRelated=["weight_for_age","weight_for_age_5_10","bmi_for_age"].includes(indexType);
+      const edemaStatus=["absent","present"].includes(e.edemaStatus)?e.edemaStatus:"unknown";
+      if(weightRelated&&edemaStatus!=="absent"){excluded.push({examId:e.id,date:e.examDate,ageMonths:months,reason:edemaStatus==="present"?"edema_present_weight_based_index_withheld":"edema_status_unknown_weight_based_index_withheld"});continue;}
       if(e.dataValidationStatus==="failed_validation"||e.verificationStatus==="failed_validation") { excluded.push({examId:e.id,date:e.examDate,ageMonths:months,reason:"measurement_failed_validation"}); continue; }
       const raw=getRawValue(indexType,patient,e,age,engine);
       if(raw.value===null){excluded.push({examId:e.id,date:e.examDate,ageMonths:months,reason:raw.reason||"incomplete_measurement"});continue;}
@@ -95,7 +99,7 @@
         const samples=[];
         for(const row of dataset.rows){
           const x=ref.axis==="ageDays"?row.axis/DAY_MONTH:row.axis;
-          if(x<ref.minMonths||x>ref.maxMonths)continue;
+          if(x<ref.minMonths||x>=ref.maxMonthsExclusive)continue;
           const L=Number(row.L),M=Number(row.M),S=Number(row.S);
           const base=1+L*S*z;
           const y=Math.abs(L)<1e-8?M*Math.exp(S*z):(base>0?M*Math.pow(base,1/L):NaN);
@@ -110,12 +114,14 @@
     if(points.some(p=>p.referenceStatus!=="validated"))warnings.push("Kurva/interpretasi WHO tidak tersedia untuk sebagian atau seluruh titik karena dataset resmi tervalidasi belum terpasang. Titik yang terlihat hanya nilai ukur, bukan kategori klinis.");
     if(excluded.length)warnings.push(`${excluded.length} catatan tidak diplot karena data tidak lengkap, tanggal tidak valid, atau usia di luar cakupan indeks.`);
     if(points.some(p=>p.sameDate))warnings.push("Ada lebih dari satu pemeriksaan pada tanggal yang sama. Titik ditampilkan terpisah dan garis longitudinal diputus di tanggal tersebut.");
+    if(excluded.some(e=>e.reason==="edema_present_weight_based_index_withheld"))warnings.push("Titik berbasis berat badan tidak diplot pada pemeriksaan dengan edema.");
+    if(excluded.some(e=>e.reason==="edema_status_unknown_weight_based_index_withheld"))warnings.push("Titik berbasis berat badan tidak diplot karena status edema belum dikonfirmasi.");
     const referenceSource=curves.length?[...new Set(curveSources.map(s=>`${s.standardId} ${s.datasetVersion} · ${s.sourceUrl||"sumber tidak dicantumkan"} · lisensi: ${s.license||"tidak dicantumkan"}`))].join("; "):"Dataset kurva WHO resmi belum tersedia";
     return {status:points.length?"has_data":"empty",indexType,label:cfg.label,unit:cfg.unit,axisLabel:"Usia saat pemeriksaan (bulan; dihitung dari tanggal lahir dan tanggal pemeriksaan)",points,segments,curves,curveSources,excluded,warnings,referenceAvailable:curves.length>0,referenceSource,sex:patient.sexAtBirth,patientId:patient.id,synthetic:patient.isDemo===true};
   }
   function renderSvg(model) {
     const W=920,H=430,L=76,R=24,T=24,B=66,innerW=W-L-R,innerH=H-T-B;
-    if(!model||!model.points?.length)return `<div class="growth-empty" role="status"><strong>Belum cukup data untuk menggambar kurva</strong><p>${(model?.warnings||["Pilih pasien dan indeks."]).map(escapeText).join(" ")}</p></div>`;
+    if(!model||(!model.points?.length&&!model.curves?.length))return `<div class="growth-empty" role="status"><strong>Belum cukup data untuk menggambar kurva</strong><p>${(model?.warnings||["Pilih pasien dan indeks."]).map(escapeText).join(" ")}</p></div>`;
     const all=[...model.points.map(p=>({x:p.ageMonths,y:p.value})),...model.curves.flatMap(c=>c.points)];
     let xmin=Math.min(0,...all.map(p=>p.x)),xmax=Math.max(12,...all.map(p=>p.x));
     const ymin0=Math.min(...all.map(p=>p.y)),ymax0=Math.max(...all.map(p=>p.y));

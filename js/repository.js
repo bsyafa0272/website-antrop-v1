@@ -215,6 +215,8 @@
       }
       const measurementType = String(input.measurementType || "");
       if (!MEASUREMENT_TYPES.includes(measurementType)) errors.push("Jenis pengukuran panjang/tinggi harus dipilih.");
+      const edemaStatus = String(input.edemaStatus || "unknown");
+      if (!["unknown", "absent", "present"].includes(edemaStatus)) errors.push("Status edema tidak valid.");
       const fields = [
         ["weightKg", "Berat badan", 0.1, 300],
         ["lengthHeightCm", "Panjang/tinggi badan", 20, 250],
@@ -233,7 +235,7 @@
       }
       const normalized = {
         patientId, rmeVisitId: String(input.rmeVisitId || "").trim() || null, examDate,
-        ...normalizedMetrics, measurementType,
+        ...normalizedMetrics, measurementType, edemaStatus,
         notes: String(input.notes || "").trim() || null
       };
       const completePrimary = normalized.weightKg !== null && normalized.lengthHeightCm !== null;
@@ -245,7 +247,7 @@
       const engine = window.PediatricGrowthEngine;
       if (!engine) return {algorithmVersion:"unavailable",referenceSchemaVersion:"unavailable",calculatedAt:nowIso(),overallStatus:"not_calculated",results:[]};
       const evaluated = engine.evaluateExam(patient, exam);
-      return {...evaluated, calculatedAt:nowIso(), referenceStandards:Object.values(window.GrowthReferenceData.standards).map(s=>({id:s.id,version:s.version,datasetVersion:s.datasetVersion,datasetStatus:s.datasetStatus,sourceUrl:s.sourceUrl}))};
+      return {...evaluated, calculatedAt:nowIso(), referenceStandards:Object.values(window.GrowthReferenceData.standards).map(s=>({id:s.id,version:s.version,datasetVersion:s.datasetVersion,datasetStatus:window.GrowthReferenceData.datasetStatus(s.id),sourceUrl:s.sourceUrl}))};
     }
 
     const repository = {
