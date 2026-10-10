@@ -12,7 +12,7 @@ Halaman utama:
 - **Daftar Pasien / Profil Pasien** — identitas, tanggal lahir, dan riwayat.
 - **Pemeriksaan Baru / Detail Pemeriksaan** — tanggal pemeriksaan, usia otomatis, pengukuran, validasi, dan koreksi.
 - **Riwayat Pemeriksaan** — daftar catatan dengan relasi pasien.
-- **Kurva Pertumbuhan** — kurva WHO LMS dan titik longitudinal dari riwayat pasien, pemilihan indeks, detail titik, cetak, dan ekspor CSV. Pada formulir pemeriksaan, kurva dan interpretasi ikut diperbarui saat nilai ukur diketik.
+- **Kurva Pertumbuhan** — kurva WHO LMS dan titik longitudinal dari riwayat pasien, pemilihan indeks, detail titik, cetak, dan ekspor CSV. Pada formulir pemeriksaan, kurva, Z-score, kategori, serta ringkasan interpretasi singkat mengikuti indeks yang dipilih dan ikut diperbarui saat nilai ukur diketik.
 - **Ringkasan Laporan** — ringkasan jumlah catatan; bukan laporan klinis tervalidasi.
 - **Jejak Perubahan** — audit lokal demo atau peristiwa yang disediakan backend bila API mendukungnya.
 

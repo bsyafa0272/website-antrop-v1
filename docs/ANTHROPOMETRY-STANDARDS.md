@@ -2,7 +2,7 @@
 
 ## Status
 
-Paket sekarang membundel LMS dari paket WHO-maintained `anthro` 1.1.0 dan `anthroplus` 1.1.0. Z-score berjalan otomatis di browser; kurva dan interpretasi pratinjau ikut berubah saat pengukuran sedang dimasukkan. Contoh resmi WHO Anthro pada README dan fixture uji WHO AnthroPlus telah dicocokkan pada presisi dua desimal untuk indikator yang diuji. Ini adalah benchmark representatif, bukan validasi klinis penuh atau persetujuan penggunaan produksi. Lihat provenance, hash, lisensi, dan cakupan di `data/references/manifest.json`.
+Paket sekarang membundel LMS dari paket WHO-maintained `anthro` 1.1.0 dan `anthroplus` 1.1.0. Z-score berjalan otomatis di browser; kurva, Z-score, kategori, dan ringkasan interpretasi pratinjau yang khusus untuk indeks terpilih ikut berubah saat pengukuran sedang dimasukkan. Teks ringkasan adalah penjelasan skrining singkat, bukan diagnosis. Contoh resmi WHO Anthro pada README dan fixture uji WHO AnthroPlus telah dicocokkan pada presisi dua desimal untuk indikator yang diuji. Ini adalah benchmark representatif, bukan validasi klinis penuh atau persetujuan penggunaan produksi. Lihat provenance, hash, lisensi, dan cakupan di `data/references/manifest.json`.
 
 JDIH Kementerian Kesehatan mencantumkan Permenkes RI Nomor 2 Tahun 2020 tentang Standar Antropometri Anak berstatus berlaku per 10 Oktober 2026. Hasil aplikasi tetap merupakan dukungan skrining: telaah mutu pengukuran, kondisi klinis (termasuk edema), tren, dan penilaian tenaga kesehatan.
 
