@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0f766e">
   <title>Pemantauan Antropometri Anak | Klinik Padjadjaran Jatinangor</title>
+  <script>
+    (() => {
+      try {
+        const preference = localStorage.getItem("pediatricAnthropometry.theme.v1") || "system";
+        const dark = preference === "dark" || (preference === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      } catch (_) {
+        document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -33,7 +45,7 @@
       <header class="topbar">
         <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Buka navigasi">☰</button>
         <div class="breadcrumb"><span>Modul klinis</span><span class="crumb-sep">/</span><strong id="breadcrumb-current">Dashboard</strong></div>
-        <div class="top-actions"><span class="secure-label" id="environment-indicator">Memuat status data…</span><div class="avatar" id="user-mode-avatar" aria-label="Lingkungan demonstrasi">DEMO</div></div>
+        <div class="top-actions"><span class="secure-label" id="environment-indicator">Memuat status data…</span><label class="theme-control"><span class="visually-hidden">Tema tampilan</span><select id="theme-select" aria-label="Tema tampilan" title="Tema tampilan"><option value="system">Otomatis</option><option value="light">Terang</option><option value="dark">Gelap</option></select></label><div class="avatar" id="user-mode-avatar" aria-label="Lingkungan demonstrasi">DEMO</div></div>
       </header>
       <div class="content" id="app-content" tabindex="-1"></div>
       <footer class="footer"><span>Klinik Padjadjaran Jatinangor</span><span>Antarmuka demonstrasi · Tidak untuk keputusan klinis</span></footer>

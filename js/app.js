@@ -9,6 +9,30 @@
   const toast = document.getElementById("toast");
   const titles = {dashboard:"Dashboard",patients:"Daftar Pasien",profile:"Profil Pasien",patientNew:"Pasien Baru",exam:"Pemeriksaan Baru",results:"Detail Pemeriksaan",growth:"Kurva Pertumbuhan",history:"Riwayat Pemeriksaan",reports:"Ringkasan Laporan"};
   const esc = utils.escape;
+  const themeStorageKey = "pediatricAnthropometry.theme.v1";
+  const themeSelect = document.getElementById("theme-select");
+  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+  let themePreference = "system";
+  try {
+    const savedTheme = localStorage.getItem(themeStorageKey);
+    if (["system", "light", "dark"].includes(savedTheme)) themePreference = savedTheme;
+  } catch (_) { /* Penyimpanan lokal dapat dinonaktifkan browser. */ }
+  function applyTheme() {
+    const resolvedTheme = themePreference === "system" ? (systemTheme.matches ? "dark" : "light") : themePreference;
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+    if (themeSelect) themeSelect.value = themePreference;
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = resolvedTheme === "dark" ? "#101b24" : "#0f766e";
+  }
+  applyTheme();
+  themeSelect?.addEventListener("change", () => {
+    themePreference = ["system", "light", "dark"].includes(themeSelect.value) ? themeSelect.value : "system";
+    try { localStorage.setItem(themeStorageKey, themePreference); } catch (_) { /* Preferensi tetap berlaku sampai halaman ditutup. */ }
+    applyTheme();
+  });
+  systemTheme.addEventListener?.("change", () => { if (themePreference === "system") applyTheme(); });
+  if (!systemTheme.addEventListener) systemTheme.addListener?.(() => { if (themePreference === "system") applyTheme(); });
   const DataService = window.AnthropometryDataService;
   const integrationConfig = window.RMEIntegrationConfig;
   const supabaseConfig = window.SupabaseConfig;
