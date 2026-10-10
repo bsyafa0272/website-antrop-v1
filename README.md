@@ -21,7 +21,7 @@ Halaman utama:
 - HTML5, CSS3, dan JavaScript vanilla; tidak membutuhkan framework atau dependensi runtime eksternal.
 - SVG untuk grafik; `localStorage` hanya untuk persistensi demo browser.
 - Node.js dan modul bawaan `assert` untuk menjalankan pengujian mandiri tanpa dependensi tambahan.
-- Fetch API untuk adapter RME yang dikonfigurasi.
+- Fetch API untuk adapter Supabase Auth/PostgREST dan adapter API RME yang dikonfigurasi.
 
 ## 3. Struktur direktori
 
@@ -37,6 +37,8 @@ pediatric-anthropometry/
 ├── js/growth-chart.js               # Model, plot SVG, ekspor CSV
 ├── js/repository.js                 # Repository demo, validasi, audit lokal
 ├── js/data-service.js               # Adapter API dan batas integrasi RME
+├── js/supabase-config.js            # Konfigurasi publik Supabase (nonaktif secara default)
+├── js/supabase-data-service.js      # Adapter Supabase Auth + PostgREST
 ├── js/app.js                        # Halaman, interaksi, formulir, status layanan
 ├── data/references/manifest.json    # Versi/status dataset, hash dan benchmark
 ├── data/references/README.md        # Petunjuk dataset rujukan
@@ -44,6 +46,8 @@ pediatric-anthropometry/
 ├── tools/build_who_reference_bundle.py # Pembuat bundle LMS browser
 ├── docs/ANTHROPOMETRY-STANDARDS.md  # Sumber standar, algoritme, gerbang klinis
 ├── docs/RME-INTEGRATION-CONTRACT.md # Kontrak dan kebutuhan backend
+├── docs/SUPABASE-SETUP.md           # Setup Auth, tabel, organisasi, dan RLS
+├── supabase/migrations/             # Skema, kebijakan akses, dan audit database
 └── tests/                           # Pengujian usia, mesin, grafik, data, UI
 ```
 
@@ -67,9 +71,15 @@ pediatric-anthropometry/
 
 ### Mode demo (default)
 
-Jika `window.RMEIntegrationConfig` tidak diaktifkan, aplikasi memakai repository demo. Data awal berisi empat pasien sintetis dan enam pemeriksaan sintetis. Perubahan disimpan di `localStorage` browser yang sama bila tersedia; bila tidak tersedia, penyimpanan menjadi memori sementara dan akan hilang saat halaman ditutup/dimuat ulang. Gunakan profil browser terpisah bila ingin menguji dari awal; jangan menganggap localStorage sebagai database klinis.
+Jika `window.RMEIntegrationConfig` dan `window.SupabaseConfig` sama-sama tidak diaktifkan, aplikasi memakai repository demo. Data awal berisi empat pasien sintetis dan enam pemeriksaan sintetis. Perubahan disimpan di `localStorage` browser yang sama bila tersedia; bila tidak tersedia, penyimpanan menjadi memori sementara dan akan hilang saat halaman ditutup/dimuat ulang. Gunakan profil browser terpisah bila ingin menguji dari awal; jangan menganggap localStorage sebagai database klinis.
 
-### Mode RME (belum dikonfigurasi)
+### Mode Supabase (belum dikonfigurasi)
+
+Adapter Supabase menyediakan login email, penyimpanan profil dan pemeriksaan, audit koreksi, versi untuk mencegah lost update, serta RLS berbasis keanggotaan organisasi. Jalankan migrasi SQL, buat organisasi dan akun staf, lalu konfigurasi `js/supabase-config.js`. Petunjuk lengkap ada di [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md). Tanpa konfigurasi valid dan sesi login, aplikasi tidak memakai data demo sebagai fallback.
+
+Snapshot perhitungan saat ini dibuat di browser dan disimpan untuk prototipe. Supabase tidak menghitung ulang Z-score di server; jangan gunakan integrasi ini untuk keputusan klinis atau rekam klinis produksi sebelum perhitungan server, validasi klinis, dan persetujuan keamanan tersedia.
+
+### Mode RME (opsional, belum dikonfigurasi)
 
 Tidak ada URL API, endpoint, skema basis data, token, atau kredensial RME Klinik Padjadjaran yang disertakan. Pengelola RME harus menyediakan kontrak endpoint dan konfigurasi deployment. Sebelum `js/data-service.js` dan `js/app.js` dijalankan, server/deployment harus menyuntikkan objek konfigurasi nonrahasia `window.RMEIntegrationConfig` sesuai contoh placeholder di [`docs/RME-INTEGRATION-CONTRACT.md`](docs/RME-INTEGRATION-CONTRACT.md).
 
@@ -113,7 +123,7 @@ Tabel LMS diekstrak dari file data dalam paket WHO `anthro` 1.1.0 dan `anthroplu
 
 ## 9. Batasan sistem
 
-- Ini adalah prototipe front-end; belum ada server klinik, database klinis, SSO, autentikasi, atau otorisasi yang disediakan oleh paket ini.
+- Ini adalah prototipe front-end; paket menyediakan adapter dan migrasi opsional Supabase, tetapi tidak menyediakan proyek/server klinik yang sudah di-host, SSO, atau konfigurasi produksi.
 - Data demo tidak nyata dan tidak boleh dicampur dengan data pasien sebenarnya.
 - Bundle dan kalkulasi Z-score tersedia untuk prototipe; belum ada validasi klinis formal, pengujian keselamatan/privasi, atau persetujuan penggunaan klinis. Hasil tidak boleh menjadi satu-satunya dasar keputusan.
 - Validasi formulir sisi klien tidak menggantikan validasi backend atau SOP pengukuran. Rentang ekstrem hanya memicu verifikasi, bukan membuktikan kesalahan.
@@ -130,8 +140,8 @@ Tabel LMS diekstrak dari file data dalam paket WHO `anthro` 1.1.0 dan `anthroplu
 5. Bila nilai berada di luar rentang kewajaran, periksa kembali sumber pengukuran sebelum memilih lanjut. Sistem tidak mengubah nilai otomatis.
 6. Untuk memulai ulang, hapus data situs untuk origin demo dari pengaturan browser atau gunakan profil browser terpisah. Penghapusan ini akan menghilangkan perubahan demo lokal.
 
-## 11. Status integrasi RME
+## 11. Status integrasi backend
 
-**Belum terhubung ke backend RME produksi.** Adapter dan kontrak integrasi tersedia, tetapi tidak ada konfigurasi endpoint nyata atau kredensial. Uji API bersifat simulasi/mock. Sebelum integrasi, minta dokumentasi API/OpenAPI resmi, contoh DTO yang disetujui, aturan ID kunjungan, lingkungan uji, mekanisme autentikasi, kebijakan akses, audit, dan pemilik integrasi. Ikuti checklist di [`docs/RME-INTEGRATION-CONTRACT.md`](docs/RME-INTEGRATION-CONTRACT.md).
+**Adapter Supabase tersedia, tetapi proyek Supabase belum dikonfigurasi atau dihubungkan.** Jalankan migrasi, siapkan akun staf, lalu isi konfigurasi publik proyek sesuai [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md). Adapter API RME juga tersedia, tetapi belum terhubung ke backend RME produksi; ikuti [`docs/RME-INTEGRATION-CONTRACT.md`](docs/RME-INTEGRATION-CONTRACT.md) untuk integrasi tersebut.
 
 **Jangan gunakan aplikasi ini untuk keputusan klinis atau data pasien nyata sampai integrasi, validasi klinis, keamanan, privasi, dan tata kelola telah diuji serta disetujui secara formal.**

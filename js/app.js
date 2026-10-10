@@ -11,6 +11,8 @@
   const esc = utils.escape;
   const DataService = window.AnthropometryDataService;
   const integrationConfig = window.RMEIntegrationConfig;
+  const supabaseConfig = window.SupabaseConfig;
+  const SupabaseDataService = window.AnthropometrySupabase;
   // Jangan membuat/menulis seed demo sama sekali saat integrasi produksi diaktifkan.
   const unavailableProductionAdapter = () => {
     const fail = async () => { throw new Error("Layanan integrasi RME tidak termuat. Mode demo dinonaktifkan karena konfigurasi produksi aktif."); };
@@ -18,10 +20,18 @@
       initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,
       listExams:fail,getExam:fail,createExam:fail,updateExam:fail,listInterpretations:fail,listAuditEvents:fail,getEntityHistory:fail,resetDemoData:fail};
   };
+  const supabaseUnavailableAdapter = () => {
+    const fail = async () => { throw new Error("Adapter Supabase tidak termuat. Mode demo dinonaktifkan karena konfigurasi Supabase aktif."); };
+    return {adapterName:"supabase-unavailable",providerLabel:"Supabase",mode:"production",isDemo:false,persistenceMode:"server-unavailable",
+      initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,
+      listExams:fail,getExam:fail,createExam:fail,updateExam:fail,listInterpretations:fail,listAuditEvents:fail,getEntityHistory:fail,signIn:fail,signOut:fail,resetDemoData:fail};
+  };
   const repo = integrationConfig?.enabled === true
     ? (DataService ? DataService.createConfiguredService({config: integrationConfig}) : unavailableProductionAdapter())
-    : Repository.createDemoRepository();
-  let serviceState = "loading", serviceError = "";
+    : supabaseConfig?.enabled === true
+      ? (SupabaseDataService ? SupabaseDataService.createConfiguredService({config: supabaseConfig}) : supabaseUnavailableAdapter())
+      : Repository.createDemoRepository();
+  let serviceState = "loading", serviceError = "", serviceCode = "";
   let state = {patients:[],exams:[],interpretations:[],auditEvents:[]};
   let currentPage = "dashboard", selectedPatientId = "", searchTerm = "", historyFilterPatientId = "", currentExamId = "", currentGrowthIndex = "weight_for_age";
   let toastTimer;
@@ -99,21 +109,25 @@
   }
   async function refresh() {
     serviceState = "loading";
-    try { state=await repo.getSnapshot(); serviceState="ready"; serviceError=""; }
-    catch (error) { serviceState="error"; serviceError=error?.message||"Backend tidak dapat dimuat."; throw error; }
+    try { state=await repo.getSnapshot(); serviceState="ready"; serviceError=""; serviceCode=""; }
+    catch (error) { serviceState="error"; serviceError=error?.message||"Backend tidak dapat dimuat."; serviceCode=error?.code||""; throw error; }
   }
   const isProduction = () => repo.mode === "production";
+  const backendLabel = () => repo.providerLabel || "backend";
   function demoNote(title, message) { return isProduction() ? "" : note(title, message); }
   function serviceBanner() {
     if (serviceState === "loading") return `<div class="note-banner" role="status"><strong>Memuat data…</strong> Mengambil profil dan riwayat melalui adapter data.</div>`;
+    if (serviceState === "error" && repo.providerLabel === "Supabase" && repo.adapterName === "supabase-postgrest") return `<div class="supabase-auth-panel" role="alert"><div><strong>${serviceCode==="UNAUTHENTICATED"?"Masuk ke Supabase":"Data Supabase belum berhasil dimuat"}</strong><p>${esc(serviceError||"Masuk memakai akun yang telah diundang administrator Supabase.")}</p></div><form id="supabase-login" class="supabase-login-form"><label class="field"><span>Email</span><input type="email" name="email" autocomplete="username" required></label><label class="field"><span>Kata sandi</span><input type="password" name="password" autocomplete="current-password" required></label><button class="button button-primary" type="submit">Masuk</button></form></div>`;
     if (serviceState === "error") return `<div class="note-banner" role="alert"><strong>Data belum berhasil dimuat.</strong> ${esc(serviceError)} Tidak ada operasi simpan yang dinyatakan berhasil. <button class="button button-secondary" data-action="retryData">Coba muat ulang</button></div>`;
-    if (repo.mode === "production") return `<div class="note-banner"><strong>Integrasi RME aktif.</strong> Data berasal dari backend yang dikonfigurasi. Autentikasi, otorisasi, validasi server, dan audit produksi wajib ditegakkan backend.</div>`;
+    if (repo.mode === "production" && repo.providerLabel === "Supabase") return `<div class="note-banner supabase-connected"><div><strong>Supabase terhubung.</strong> Data yang terlihat dibatasi oleh kebijakan organisasi dan RLS.</div><button class="button button-secondary" data-action="supabaseSignOut">Keluar</button></div>`;
+    if (repo.mode === "production") return `<div class="note-banner"><strong>Integrasi ${esc(backendLabel())} aktif.</strong> Data berasal dari backend yang dikonfigurasi. Autentikasi, otorisasi, validasi server, dan audit produksi wajib ditegakkan backend.</div>`;
     return repo.persistenceMode === "memory-only"
       ? `<div class="note-banner"><strong>MODE DEMO — PENYIMPANAN MEMORI SEMENTARA.</strong> Data sintetis hanya ada selama halaman ini hidup; data tidak tersimpan permanen dan dapat hilang saat dimuat ulang.</div>`
       : `<div class="note-banner"><strong>MODE DEMO — DATA SIMULASI.</strong> Perubahan disimpan di localStorage browser ini saja, bukan ke RME/server, dan tidak cocok untuk data pasien nyata.</div>`;
   }
   function successPersistenceMessage(action) {
-    if (repo.mode === "production") return `${action} dikonfirmasi backend RME.`;
+    if (repo.providerLabel === "Supabase") return `${action} tersimpan di Supabase.`;
+    if (repo.mode === "production") return `${action} dikonfirmasi ${backendLabel()}.`;
     return repo.persistenceMode === "memory-only" ? `${action} hanya tersimpan sementara di memori demo; tidak permanen.` : `${action} tersimpan di localStorage demo browser ini; belum dikirim ke RME.`;
   }
   function setPage(page) {
@@ -132,10 +146,10 @@
   }
   function dashboard() {
     const recent=examsFor(null).slice(0,5);
-    return `${heading("Dashboard pemantauan antropometri",isProduction()?"Kelola profil dan telusuri pengukuran longitudinal dari backend RME.":"Kelola profil pasien demo dan telusuri pengukuran longitudinal.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`)}
+    return `${heading("Dashboard pemantauan antropometri",isProduction()?`Kelola profil dan telusuri pengukuran longitudinal dari ${esc(backendLabel())}.`:"Kelola profil pasien demo dan telusuri pengukuran longitudinal.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`)}
       ${demoNote("MODE DEMONSTRASI — DATA SIMULASI","Semua pasien dan pemeriksaan di aplikasi ini sintetis, terpisah dari data pasien nyata, dan belum terhubung ke RME.")}
-      <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Snapshot RME tersimpan</div><div class="stat-value">${state.interpretations.filter(i=>i.validationStatus==="valid").length}</div><div class="stat-foot">Perhitungan layar memakai WHO LMS aktif</div></div></div>
-      <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Daftar pasien</strong><span>Cari dan buka profil</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}${panel(isProduction()?"Penyimpanan RME":"Penyimpanan demo","Adapter data aktif",`<div class="panel-body"><p class="muted">${esc(repo.adapterName)}. ${isProduction()?"Perubahan dikirim ke backend yang dikonfigurasi; pastikan server menegakkan otorisasi dan audit.":"Perubahan disimpan di localStorage demo browser ini, dengan jejak audit lokal untuk pembuatan dan koreksi. Ini bukan penyimpanan klinis."}</p><button class="button button-secondary" data-action="audit">Lihat jejak perubahan</button></div>`)}</div></div>`;
+      <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Snapshot antropometri valid</div><div class="stat-value">${state.exams.filter(e=>e.anthropometryCalculation?.results?.some(r=>r.validityStatus==="valid")).length}</div><div class="stat-foot">Perhitungan layar memakai WHO LMS aktif</div></div></div>
+      <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Daftar pasien</strong><span>Cari dan buka profil</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}${panel(isProduction()?`Penyimpanan ${esc(backendLabel())}`:"Penyimpanan demo","Adapter data aktif",`<div class="panel-body"><p class="muted">${esc(repo.adapterName)}. ${isProduction()?`Perubahan dikirim ke ${esc(backendLabel())}; akses dan audit dikelola oleh backend.`:"Perubahan disimpan di localStorage demo browser ini, dengan jejak audit lokal untuk pembuatan dan koreksi. Ini bukan penyimpanan klinis."}</p><button class="button button-secondary" data-action="audit">Lihat jejak perubahan</button></div>`)}</div></div>`;
   }
   function patientsPage() {
     const list=state.patients.filter(p=>[p.name,p.medicalRecordNumber,p.id].some(v=>String(v||"").toLowerCase().includes(searchTerm.toLowerCase())));
@@ -264,24 +278,25 @@
     const dot = document.getElementById("environment-status-dot");
     if (!title || !detail || !indicator || !avatar) return;
     if (repo.mode === "production") {
+      const provider=repo.providerLabel||"RME";
       if (serviceState === "ready") {
-        title.textContent = "RME terhubung";
-        detail.textContent = "Snapshot backend berhasil dimuat pada sesi ini.";
-        indicator.textContent = "▣ RME · sesi terhubung";
-        avatar.textContent = "RME";
-        avatar.setAttribute("aria-label", "Sesi integrasi RME");
+        title.textContent = `${provider} terhubung`;
+        detail.textContent = "Data organisasi berhasil dimuat untuk sesi ini.";
+        indicator.textContent = `▣ ${provider} · terhubung`;
+        avatar.textContent = provider==="Supabase"?"SB":"RME";
+        avatar.setAttribute("aria-label", `Sesi integrasi ${provider}`);
       } else if (serviceState === "loading") {
-        title.textContent = "Menghubungkan RME…";
+        title.textContent = `Menghubungkan ${provider}…`;
         detail.textContent = "Menunggu respons backend; data belum dikonfirmasi.";
-        indicator.textContent = "▣ Menghubungkan RME…";
-        avatar.textContent = "RME";
-        avatar.setAttribute("aria-label", "Menghubungkan ke RME");
+        indicator.textContent = `▣ Menghubungkan ${provider}…`;
+        avatar.textContent = provider==="Supabase"?"SB":"RME";
+        avatar.setAttribute("aria-label", `Menghubungkan ke ${provider}`);
       } else {
-        title.textContent = "Integrasi RME gagal";
+        title.textContent = `Integrasi ${provider} gagal`;
         detail.textContent = "Backend belum dapat dikonfirmasi. Tidak menggunakan data demo.";
-        indicator.textContent = "▣ RME tidak tersedia";
+        indicator.textContent = `▣ ${provider} tidak tersedia`;
         avatar.textContent = "ERR";
-        avatar.setAttribute("aria-label", "Integrasi RME tidak tersedia");
+        avatar.setAttribute("aria-label", `Integrasi ${provider} tidak tersedia`);
       }
     } else if (repo.persistenceMode === "memory-only") {
       title.textContent = "Demo · memori sementara";
@@ -309,8 +324,9 @@
   function handleError(error) {
     if(error?.code==="VALIDATION_ERROR") notify(error.message);
     else if(error?.code==="NOT_FOUND") notify(error.message||"ID tidak ditemukan.");
-    else if(error?.code==="UNAUTHENTICATED") notify("Sesi tidak terautentikasi. Silakan masuk ke RME lalu muat ulang.");
-    else if(error?.code==="FORBIDDEN") notify("Akses ditolak. Periksa hak akses pengguna pada RME.");
+    else if(error?.code==="UNAUTHENTICATED"&&repo.providerLabel==="Supabase"){serviceState="error";serviceCode="UNAUTHENTICATED";serviceError=error.message||"Silakan masuk kembali.";render();}
+    else if(error?.code==="UNAUTHENTICATED") notify(`Sesi tidak terautentikasi. Silakan masuk ke ${backendLabel()} lalu muat ulang.`);
+    else if(error?.code==="FORBIDDEN") notify(`Akses ditolak. Periksa hak akses pengguna pada ${backendLabel()}.`);
     else if(error?.code==="CONFLICT") notify("Konflik perubahan. Muat ulang data sebelum mengoreksi; perubahan belum dikonfirmasi.");
     else { if(["NETWORK_ERROR","SERVER_ERROR","INVALID_RESPONSE"].includes(error?.code)){serviceState="error";serviceError=error.message||"Backend tidak tersedia.";render();} notify(`Operasi gagal: ${error?.message||"kesalahan tidak diketahui"}`); }
   }
@@ -334,6 +350,7 @@
       if(next==="audit") {setPage("audit");return;}
       if(next==="growthPoint") { currentExamId=id||""; setPage("examDetail"); return; }
       if(next==="retryData") { serviceState="loading"; render(); await refresh(); render(); notify(repo.mode === "production" ? "Data backend berhasil dimuat ulang." : "Data demo berhasil dimuat ulang."); return; }
+      if(next==="supabaseSignOut") { await repo.signOut(); state={patients:[],exams:[],interpretations:[],auditEvents:[]};serviceState="error";serviceCode="UNAUTHENTICATED";serviceError="Sesi telah diakhiri.";render();return; }
       if(next==="printGrowth") { if(typeof window.print==="function")window.print(); return; }
       if(next==="exportGrowth") { exportGrowthCsv(); return; }
     } catch(err){handleError(err);}
@@ -383,6 +400,13 @@
 
   document.addEventListener("submit",async e=>{
     const form=e.target;
+    if(form.id==="supabase-login"){
+      e.preventDefault();const fields=new FormData(form),button=form.querySelector('button[type="submit"]');
+      if(button){button.disabled=true;button.textContent="Menghubungkan…";}
+      try{await repo.signIn(String(fields.get("email")||""),String(fields.get("password")||""));state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";render();notify("Supabase terhubung; data organisasi berhasil dimuat.");}
+      catch(error){serviceState="error";serviceCode=error?.code||"";serviceError=error?.message||"Login Supabase gagal.";render();}
+      return;
+    }
     if(!["patient-form","exam-form"].includes(form.id))return;
     e.preventDefault(); const fd=new FormData(form);
     const submitButton=typeof form.querySelector === "function" ? form.querySelector('button[type="submit"]') : null;
@@ -415,5 +439,5 @@
   document.getElementById("menu-toggle").addEventListener("click",()=>sidebar.classList.toggle("open"));
   document.addEventListener("keydown",e=>{if(e.key==="Escape")sidebar.classList.remove("open");});
   content.innerHTML=serviceBanner();
-  (async()=>{try{state=await repo.initialize();serviceState="ready";serviceError="";const params=new URLSearchParams(location.search);if(params.has("exam")){currentExamId=params.get("exam");currentPage="examDetail";}setPage(currentPage);}catch(err){serviceState="error";serviceError=err.message||"Backend tidak tersedia.";content.innerHTML=serviceBanner();}})();
+  (async()=>{try{state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";const params=new URLSearchParams(location.search);if(params.has("exam")){currentExamId=params.get("exam");currentPage="examDetail";}setPage(currentPage);}catch(err){serviceState="error";serviceError=err.message||"Backend tidak tersedia.";serviceCode=err?.code||"";content.innerHTML=serviceBanner();}})();
 })();

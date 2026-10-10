@@ -2,7 +2,7 @@
 
 ## Status implementasi
 
-Extension ini belum terhubung ke RME produksi. Tidak ada endpoint, skema database, token, atau kredensial klinik yang diasumsikan. Tanpa `window.RMEIntegrationConfig.enabled === true`, aplikasi hanya memakai adapter simulasi yang ditandai `isDemo: true`. Adapter demo memakai `localStorage` bila tersedia dan memberi status memori sementara jika penyimpanan browser tidak tersedia.
+Adapter RME generik dan adapter Supabase tersedia, tetapi belum dikonfigurasi ke proyek produksi. Jika keduanya tidak diaktifkan, aplikasi memakai adapter simulasi yang ditandai `isDemo: true`. Adapter demo memakai `localStorage` bila tersedia dan memberi status memori sementara jika penyimpanan browser tidak tersedia. Untuk setup Supabase, lihat `docs/SUPABASE-SETUP.md`.
 
 `js/data-service.js` menyediakan batas integrasi dan adapter API yang dikonfigurasi pengelola RME. `js/app.js` menggunakan antarmuka adapter yang sama, sehingga UI tidak perlu ditulis ulang ketika route kontrak resmi disediakan. Jika konfigurasi produksi aktif tetapi tidak lengkap, adapter gagal tertutup; aplikasi tidak diam-diam berpindah ke demo.
 
