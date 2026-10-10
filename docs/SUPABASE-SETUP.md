@@ -22,8 +22,9 @@ Adapter memakai REST API Supabase tanpa SDK eksternal. `publicDemo: true` mengak
    ```
 
 3. Isi URL proyek, publishable/anon key, dan UUID organisasi demo pada `js/supabase-config.js`; atur `enabled: true` dan `publicDemo: true`.
-4. Sajikan situs melalui HTTPS (HTTP localhost diperbolehkan untuk pengembangan), lalu muat ulang. Tidak ada akun yang perlu dimasukkan.
-5. Untuk mode staf privat, buat/invitasikan akun pada **Authentication → Users**, daftarkan UUID akun pada `organization_members`, lalu ubah `publicDemo: false`.
+4. Buka `supabase/seeds/public_demo_dummy_data.sql`, lalu jalankan isinya di SQL Editor. File ini sudah memakai UUID organisasi dari konfigurasi lokal. Seed membuat pasien sintetis Jaka Widada dengan lima pengukuran longitudinal dan aman dijalankan ulang.
+5. Sajikan situs melalui HTTPS (HTTP localhost diperbolehkan untuk pengembangan), lalu muat ulang. Tidak ada akun yang perlu dimasukkan.
+6. Untuk mode staf privat, buat/invitasikan akun pada **Authentication → Users**, daftarkan UUID akun pada `organization_members`, lalu ubah `publicDemo: false`.
 
 ## Keamanan konfigurasi
 

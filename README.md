@@ -48,6 +48,7 @@ pediatric-anthropometry/
 ├── docs/RME-INTEGRATION-CONTRACT.md # Kontrak dan kebutuhan backend
 ├── docs/SUPABASE-SETUP.md           # Setup demo publik/Auth, tabel, organisasi, dan RLS
 ├── supabase/migrations/             # Skema, kebijakan akses, dan audit database
+├── supabase/seeds/                  # Data sintetis untuk demo publik
 └── tests/                           # Pengujian usia, mesin, grafik, data, UI
 ```
 
