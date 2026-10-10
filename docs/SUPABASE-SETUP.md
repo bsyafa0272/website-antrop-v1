@@ -1,36 +1,37 @@
 # Menyiapkan Supabase
 
-Adapter Supabase memakai Auth dan REST API bawaan Supabase, tanpa SDK eksternal. Integrasi aktif hanya setelah `window.SupabaseConfig.enabled` diubah menjadi `true`; konfigurasi salah akan gagal tertutup dan tidak beralih ke localStorage demo.
+Adapter memakai REST API Supabase tanpa SDK eksternal. `publicDemo: true` mengaktifkan demo publik tanpa login, sedangkan `publicDemo: false` memakai login staf. Keduanya gagal tertutup dan tidak beralih ke localStorage jika backend aktif tetapi gagal.
 
 ## Setup proyek
 
-1. Buat proyek Supabase dan jalankan seluruh SQL di `supabase/migrations/20261010000000_anthropometry.sql` melalui SQL Editor.
-2. Buat satu organisasi:
+1. Buat proyek Supabase. Jalankan isi `supabase/migrations/20261010000000_anthropometry.sql`, lalu `supabase/migrations/20261011000000_public_synthetic_demo.sql` melalui SQL Editor.
+2. Buat **organisasi khusus demo** dengan tanda publik:
 
    ```sql
-   insert into public.organizations (name)
-   values ('Nama Klinik')
+   insert into public.organizations (name, is_public_demo)
+   values ('Demo Antropometri Sintetis', true)
    returning id;
    ```
 
-3. Buat/invitasikan akun staf di **Authentication → Users**. Ambil UUID pengguna dari tabel `auth.users`, lalu daftarkan ke organisasi melalui SQL Editor:
+   Isi `organizationId` di `js/supabase-config.js` dengan UUID hasil ini. Jangan tandai organisasi staf/klinik yang berisi data lain sebagai demo publik. Untuk organisasi demo yang sudah ada, tandai hanya setelah memastikan seluruh isinya sintetis:
 
    ```sql
-   insert into public.organization_members (organization_id, user_id, role)
-   values ('<organization-uuid>', '<auth-user-uuid>', 'admin');
+   update public.organizations
+   set is_public_demo = true
+   where id = '<organization-uuid>';
    ```
 
-   Peran yang didukung: `admin`, `clinician`, dan `reviewer`. Reviewer hanya dapat membaca. Anggota organisasi melihat catatan organisasi yang sama.
-4. Isi URL proyek, publishable/anon key, dan UUID organisasi pada `js/supabase-config.js`; kemudian set `enabled: true`.
-5. Sajikan situs melalui HTTPS (HTTP localhost diperbolehkan untuk pengembangan), muat ulang, lalu masuk dengan akun yang dibuat administrator.
+3. Isi URL proyek, publishable/anon key, dan UUID organisasi demo pada `js/supabase-config.js`; atur `enabled: true` dan `publicDemo: true`.
+4. Sajikan situs melalui HTTPS (HTTP localhost diperbolehkan untuk pengembangan), lalu muat ulang. Tidak ada akun yang perlu dimasukkan.
+5. Untuk mode staf privat, buat/invitasikan akun pada **Authentication → Users**, daftarkan UUID akun pada `organization_members`, lalu ubah `publicDemo: false`.
 
 ## Keamanan konfigurasi
 
-- Publishable/anon key memang dikirim ke browser. Keamanan data bergantung pada RLS dan role yang benar. Migrasi mengaktifkan RLS pada semua tabel klinis dan tidak memberi akses tabel kepada role `anon`.
+- Publishable/anon key memang dikirim ke browser. Dalam mode publik, role `anon` hanya mendapat akses ke baris di organisasi bertanda `is_public_demo`; jangan tandai organisasi yang berisi data klinis nyata.
+- Pengunjung demo publik dapat melihat serta mengoreksi data sintetis bersama. Pembatasan penghapusan tidak mencegah spam atau perubahan merusak; gunakan hanya untuk data buatan dan reset data demo bila perlu.
 - Jangan menaruh `service_role` key, password staf, atau secret lain di repo, HTML, JavaScript, maupun variabel browser. Service-role hanya boleh berada pada server tepercaya dan tidak dibutuhkan oleh adapter ini.
-- Buat akun staf melalui undangan administrator; pendaftaran publik tidak diaktifkan oleh aplikasi.
-- Sesi memakai `sessionStorage`, token diperbarui melalui Supabase Auth, dan aksi keluar menghapus sesi browser.
-- Kebijakan pada migrasi berbagi pasien/pemeriksaan dengan anggota organisasi; role admin/clinician dapat membuat dan mengoreksi data. Periksa kebijakan dan kebutuhan isolasi tenant organisasi sebelum mengimpor data.
+- Mode demo publik tidak memakai Auth. Mode staf memakai sesi `sessionStorage`, refresh token Supabase Auth, dan tombol keluar.
+- Kebijakan akses staf tetap berbasis keanggotaan organisasi; role admin/clinician dapat membuat dan mengoreksi data, reviewer hanya membaca.
 
 ## Data yang disimpan
 

@@ -38,7 +38,7 @@ pediatric-anthropometry/
 ├── js/repository.js                 # Repository demo, validasi, audit lokal
 ├── js/data-service.js               # Adapter API dan batas integrasi RME
 ├── js/supabase-config.js            # Konfigurasi publik Supabase untuk workspace ini
-├── js/supabase-data-service.js      # Adapter Supabase Auth + PostgREST
+├── js/supabase-data-service.js      # Adapter Supabase publik/Auth + PostgREST
 ├── js/app.js                        # Halaman, interaksi, formulir, status layanan
 ├── data/references/manifest.json    # Versi/status dataset, hash dan benchmark
 ├── data/references/README.md        # Petunjuk dataset rujukan
@@ -46,7 +46,7 @@ pediatric-anthropometry/
 ├── tools/build_who_reference_bundle.py # Pembuat bundle LMS browser
 ├── docs/ANTHROPOMETRY-STANDARDS.md  # Sumber standar, algoritme, gerbang klinis
 ├── docs/RME-INTEGRATION-CONTRACT.md # Kontrak dan kebutuhan backend
-├── docs/SUPABASE-SETUP.md           # Setup Auth, tabel, organisasi, dan RLS
+├── docs/SUPABASE-SETUP.md           # Setup demo publik/Auth, tabel, organisasi, dan RLS
 ├── supabase/migrations/             # Skema, kebijakan akses, dan audit database
 └── tests/                           # Pengujian usia, mesin, grafik, data, UI
 ```
@@ -75,7 +75,7 @@ Jika `window.RMEIntegrationConfig` dan `window.SupabaseConfig` sama-sama tidak d
 
 ### Mode Supabase
 
-Adapter Supabase menyediakan login email, penyimpanan profil dan pemeriksaan, audit koreksi, versi untuk mencegah lost update, serta RLS berbasis keanggotaan organisasi. Konfigurasi lokal pada workspace ini sudah diaktifkan. Pastikan migrasi SQL telah berhasil dijalankan dan akun staf telah menjadi anggota organisasi; petunjuk lengkap ada di [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md). Tanpa konfigurasi valid dan sesi login, aplikasi tidak memakai data demo sebagai fallback.
+Adapter Supabase menyediakan mode demo publik tanpa login dan mode staf dengan login email. Mode publik dibatasi oleh RLS ke satu organisasi khusus yang ditandai sebagai demo; setiap pengunjung dapat membaca dan mengoreksi data sintetis organisasi itu. Konfigurasi lokal pada workspace ini mengaktifkan mode demo publik. Jalankan kedua migrasi secara berurutan dan tandai organisasi demo sebelum dipakai; petunjuk lengkap ada di [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md). Jangan gunakan mode publik untuk data pasien nyata.
 
 Snapshot perhitungan saat ini dibuat di browser dan disimpan untuk prototipe. Supabase tidak menghitung ulang Z-score di server; jangan gunakan integrasi ini untuk keputusan klinis atau rekam klinis produksi sebelum perhitungan server, validasi klinis, dan persetujuan keamanan tersedia.
 
@@ -142,6 +142,6 @@ Tabel LMS diekstrak dari file data dalam paket WHO `anthro` 1.1.0 dan `anthroplu
 
 ## 11. Status integrasi backend
 
-**Adapter Supabase dan konfigurasi lokal tersedia serta aktif, tetapi koneksi ke proyek belum diverifikasi dari aplikasi.** Jalankan migrasi, siapkan akun staf, dan daftarkan pengguna ke organisasi sesuai [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md). Adapter API RME juga tersedia, tetapi belum terhubung ke backend RME produksi; ikuti [`docs/RME-INTEGRATION-CONTRACT.md`](docs/RME-INTEGRATION-CONTRACT.md) untuk integrasi tersebut.
+**Mode demo publik Supabase sudah dikonfigurasi, tetapi akses anonim membutuhkan migrasi demo publik dan organisasi khusus yang ditandai `is_public_demo`.** Ikuti [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md); jangan gunakan organisasi ini untuk data klinis nyata. Adapter API RME juga tersedia, tetapi belum terhubung ke backend RME produksi; ikuti [`docs/RME-INTEGRATION-CONTRACT.md`](docs/RME-INTEGRATION-CONTRACT.md) untuk integrasi tersebut.
 
 **Jangan gunakan aplikasi ini untuk keputusan klinis atau data pasien nyata sampai integrasi, validasi klinis, keamanan, privasi, dan tata kelola telah diuji serta disetujui secara formal.**

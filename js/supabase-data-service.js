@@ -12,6 +12,7 @@
   function createSupabaseAdapter(config, dependencies = {}) {
     const fetchImpl = dependencies.fetch || (typeof fetch === "function" ? fetch.bind(globalThis) : null);
     const storage = dependencies.storage || (typeof sessionStorage !== "undefined" ? sessionStorage : null);
+    const publicDemo = config?.publicDemo === true;
     const clock = dependencies.clock || (() => Date.now());
     const baseUrl = String(config?.url || "").replace(/\/$/, "");
     const anonKey = String(config?.anonKey || "").trim();
@@ -27,11 +28,14 @@
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(config?.organizationId || ""))) {
       throw new SupabaseDataError("CONFIGURATION_ERROR", "UUID organizationId Supabase belum dikonfigurasi.");
     }
-    if (!storage) throw new SupabaseDataError("CONFIGURATION_ERROR", "sessionStorage tidak tersedia untuk sesi login Supabase.");
-    try { session = JSON.parse(storage.getItem(sessionKey) || "null"); } catch (_) { storage.removeItem(sessionKey); }
+    if (!publicDemo && !storage) throw new SupabaseDataError("CONFIGURATION_ERROR", "sessionStorage tidak tersedia untuk sesi login Supabase.");
+    if (!publicDemo) {
+      try { session = JSON.parse(storage.getItem(sessionKey) || "null"); } catch (_) { storage.removeItem(sessionKey); }
+    }
 
     function saveSession(value) {
       session = value;
+      if (publicDemo) return;
       if (value) storage.setItem(sessionKey, JSON.stringify(value));
       else storage.removeItem(sessionKey);
     }
@@ -79,6 +83,7 @@
       return session;
     }
     async function accessToken() {
+      if (publicDemo) return null;
       if (!session?.access_token) throw new SupabaseDataError("UNAUTHENTICATED", "Silakan masuk dengan akun Supabase yang telah dibuat administrator.");
       if (!session.expires_at || Number(session.expires_at) <= clock() + 30000) await refreshSession();
       return session.access_token;
@@ -90,7 +95,7 @@
     async function readAll(table, query = {}) {
       const rows = [], pageSize = 1000, maxRows = 50000;
       for (let offset = 0; offset < maxRows; offset += pageSize) {
-        const page = await request(table, {query: {...query, limit: pageSize, offset}});
+        const page = await request(table, {query: {...query, organization_id: `eq.${config.organizationId}`, limit: pageSize, offset}});
         rows.push(...page);
         if (page.length < pageSize) return rows;
       }
@@ -101,7 +106,7 @@
       birthDate: row.birth_date, sexAtBirth: row.sex_at_birth,
       gestationalAgeAtBirth: row.gestational_age_at_birth,
       guardianName: row.guardian_name, clinicalNotes: row.clinical_notes,
-      version: row.version, createdAt: row.created_at, updatedAt: row.updated_at, isDemo: false
+      version: row.version, createdAt: row.created_at, updatedAt: row.updated_at, isDemo: publicDemo
     });
     const examFromRow = row => ({
       id: row.id, patientId: row.patient_id, rmeVisitId: row.rme_visit_id,
@@ -113,7 +118,7 @@
       notes: row.notes, recordedBy: row.recorded_by, createdAt: row.created_at, updatedAt: row.updated_at,
       version: row.version, verificationStatus: row.verification_status,
       dataValidationStatus: row.data_validation_status, interpretationStatus: row.interpretation_status,
-      anthropometryCalculation: row.anthropometry_calculation, isDemo: false
+      anthropometryCalculation: row.anthropometry_calculation, isDemo: publicDemo
     });
     const auditFromRow = row => ({id: row.id, entityType: row.entity_type, entityId: row.entity_id,
       action: row.action, before: row.before_data, after: row.after_data,
@@ -144,7 +149,7 @@
         measurement_type: input.measurementType, edema_status: input.edemaStatus || "unknown",
         head_circumference_cm: input.headCircumferenceCm === "" ? null : input.headCircumferenceCm,
         mid_upper_arm_circumference_cm: input.midUpperArmCircumferenceCm === "" ? null : input.midUpperArmCircumferenceCm,
-        notes: input.notes || null, recorded_by: session.user?.id || null,
+        notes: input.notes || null, recorded_by: session?.user?.id || null,
         data_validation_status: primaryComplete ? "valid" : "incomplete",
         interpretation_status: hasValid ? "valid" : primaryComplete ? "not_calculated" : "incomplete",
         verification_status: verificationStatus, anthropometry_calculation: snapshot
@@ -152,20 +157,26 @@
     }
 
     return {
-      adapterName: "supabase-postgrest", providerLabel: "Supabase", mode: "production",
-      persistenceMode: "server-confirmed", isDemo: false,
+      adapterName: "supabase-postgrest", providerLabel: "Supabase", mode: "production", publicDemo, authRequired: !publicDemo,
+      persistenceMode: "server-confirmed", isDemo: publicDemo,
       async signIn(email, password) {
+        if (publicDemo) throw new SupabaseDataError("NOT_SUPPORTED", "Mode demo publik tidak memakai login.");
         const result = await rawFetch("/auth/v1/token?grant_type=password", {method: "POST", body: {email, password}, retryAuth: false});
         saveSession({...result, expires_at: clock() + Number(result.expires_in || 3600) * 1000 - 30000});
         return {id: result.user?.id, email: result.user?.email};
       },
       async signOut() {
+        if (publicDemo) return;
         try { if (session?.access_token) await rawFetch("/auth/v1/logout", {method: "POST", token: session.access_token, retryAuth: false}); } catch (_) {}
         finally { saveSession(null); }
       },
       get currentUser() { return session?.user ? {id: session.user.id, email: session.user.email} : null; },
       async initialize() { return this.getSnapshot(); },
       async getSnapshot() {
+        if (publicDemo) {
+          const organizations = await request("organizations", {query: {select: "id,is_public_demo", id: `eq.${config.organizationId}`, limit: 1}});
+          if (!organizations?.[0]?.is_public_demo) throw new SupabaseDataError("PUBLIC_DEMO_NOT_ENABLED", "Organisasi ini belum ditandai sebagai demo publik. Jalankan migrasi demo publik dan tandai hanya organisasi yang berisi data sintetis.");
+        }
         const [patients, exams, auditEvents] = await Promise.all([
           readAll("patients", {select: "*", order: "name.asc,id.asc"}),
           readAll("exams", {select: "*", order: "exam_date.desc,id.asc"}),
@@ -179,28 +190,28 @@
       },
       async listPatients() { return (await readAll("patients", {select: "*", order: "name.asc,id.asc"})).map(patientFromRow); },
       async getPatient(id) {
-        const rows = await request("patients", {query: {select: "*", id: `eq.${id}`, limit: 1}});
+        const rows = await request("patients", {query: {select: "*", id: `eq.${id}`, organization_id: `eq.${config.organizationId}`, limit: 1}});
         if (!rows.length) throw new SupabaseDataError("NOT_FOUND", "Pasien tidak ditemukan atau tidak dapat diakses.");
         return patientFromRow(rows[0]);
       },
       async createPatient(input) {
-        const rows = await request("patients", {method: "POST", body: patientRow(input, session.user.id)});
+        const rows = await request("patients", {method: "POST", body: patientRow(input, session?.user?.id || null)});
         if (!rows?.[0]) throw new SupabaseDataError("INVALID_RESPONSE", "Supabase tidak mengembalikan pasien yang dibuat.");
         return patientFromRow(rows[0]);
       },
       async updatePatient(id, input) {
         const current = await this.getPatient(id);
         const version = input.version ?? current.version;
-        const rows = await request("patients", {method: "PATCH", query: {id: `eq.${id}`, version: `eq.${version}`}, body: patientRow(input, session.user.id)});
+        const rows = await request("patients", {method: "PATCH", query: {id: `eq.${id}`, organization_id: `eq.${config.organizationId}`, version: `eq.${version}`}, body: patientRow(input, session?.user?.id || null)});
         if (!rows?.[0]) throw new SupabaseDataError("CONFLICT", "Data pasien berubah di server. Muat ulang sebelum mencoba koreksi.");
         return patientFromRow(rows[0]);
       },
       async listExams(patientId = null) {
-        const query = {select: "*", order: "exam_date.desc,id.asc"}; if (patientId) query.patient_id = `eq.${patientId}`;
+        const query = {select: "*", order: "exam_date.desc,id.asc", organization_id: `eq.${config.organizationId}`}; if (patientId) query.patient_id = `eq.${patientId}`;
         return (await readAll("exams", query)).map(examFromRow);
       },
       async getExam(id) {
-        const rows = await request("exams", {query: {select: "*", id: `eq.${id}`, limit: 1}});
+        const rows = await request("exams", {query: {select: "*", id: `eq.${id}`, organization_id: `eq.${config.organizationId}`, limit: 1}});
         if (!rows.length) throw new SupabaseDataError("NOT_FOUND", "Pemeriksaan tidak ditemukan atau tidak dapat diakses.");
         return examFromRow(rows[0]);
       },
@@ -208,7 +219,7 @@
         if (!input.patientId) throw new SupabaseDataError("VALIDATION_ERROR", "Pemeriksaan wajib terhubung ke pasien.");
         const patient = await this.getPatient(input.patientId);
         const snapshot = calculateSnapshot(patient, input);
-        const rows = await request("exams", {method: "POST", body: examRow(input, patient, await snapshot, session.user.id)});
+        const rows = await request("exams", {method: "POST", body: examRow(input, patient, await snapshot, session?.user?.id || null)});
         if (!rows?.[0]) throw new SupabaseDataError("INVALID_RESPONSE", "Supabase tidak mengembalikan pemeriksaan yang dibuat.");
         return examFromRow(rows[0]);
       },
@@ -217,13 +228,14 @@
         const [current, patient] = await Promise.all([this.getExam(id), this.getPatient(input.patientId)]);
         const version = input.version ?? current.version;
         const snapshot = await calculateSnapshot(patient, input);
-        const rows = await request("exams", {method: "PATCH", query: {id: `eq.${id}`, version: `eq.${version}`}, body: examRow(input, patient, snapshot, session.user.id, current.verificationStatus)});
+        const rows = await request("exams", {method: "PATCH", query: {id: `eq.${id}`, organization_id: `eq.${config.organizationId}`, version: `eq.${version}`}, body: examRow(input, patient, snapshot, session?.user?.id || null, current.verificationStatus)});
         if (!rows?.[0]) throw new SupabaseDataError("CONFLICT", "Pemeriksaan berubah di server. Muat ulang sebelum mencoba koreksi.");
         return examFromRow(rows[0]);
       },
       async listInterpretations() { return []; },
       async listAuditEvents({entityType = null, entityId = null, limit = 100} = {}) {
         const query = {select: "*", order: "occurred_at.desc", limit: Math.max(1, Math.min(Number(limit) || 100, 500))};
+        query.organization_id = `eq.${config.organizationId}`;
         if (entityType) query.entity_type = `eq.${entityType}`;
         if (entityId) query.entity_id = `eq.${entityId}`;
         return (await request("audit_events", {query})).map(auditFromRow);
@@ -238,7 +250,7 @@
     try { return createSupabaseAdapter(config, dependencies); }
     catch (error) {
       const unavailable = async () => { throw error; };
-      return {adapterName: "supabase-misconfigured", providerLabel: "Supabase", mode: "production", isDemo: false, persistenceMode: "server-unavailable",
+      return {adapterName: "supabase-misconfigured", providerLabel: "Supabase", mode: "production", publicDemo: config.publicDemo === true, authRequired: config.publicDemo !== true, isDemo: config.publicDemo === true, persistenceMode: "server-unavailable",
         initialize: unavailable, getSnapshot: unavailable, listPatients: unavailable, getPatient: unavailable,
         createPatient: unavailable, updatePatient: unavailable, listExams: unavailable, getExam: unavailable,
         createExam: unavailable, updateExam: unavailable, listInterpretations: unavailable, listAuditEvents: unavailable,
