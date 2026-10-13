@@ -74,6 +74,16 @@ img,svg,canvas{max-width:100%}
 @media(max-width:560px){.growth-interpretation{grid-template-columns:1fr;gap:8px}.growth-interpretation-score{text-align:left}.growth-interpretation small{grid-column:auto}}
 .supabase-auth-panel{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr);gap:18px;align-items:center;margin:0 0 18px;padding:18px 20px;border:1px solid #cfe4e1;border-radius:12px;background:#f6fbfa;color:#294550}.supabase-auth-panel strong{font-size:14px}.supabase-auth-panel p{margin:5px 0 0;color:var(--muted);font-size:12px}.supabase-login-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) auto;gap:10px;align-items:end}.supabase-login-form .field span{font-size:11px;font-weight:750;color:#465b69}.supabase-connected{justify-content:space-between;align-items:center}
 @media(max-width:720px){.supabase-auth-panel{grid-template-columns:1fr;padding:15px}.supabase-login-form{grid-template-columns:1fr}.supabase-login-form .button{width:100%}}
+.combined-population-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 14px}
+.combined-population-stats .stat-card{padding:13px}
+.combined-population-stats .stat-value{font-size:23px;margin:7px 0 0}
+.combined-subheading{font-size:12px;margin:16px 0 9px}
+.combined-age-group+.combined-age-group{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+.combined-age-group .combined-subheading{margin-top:0}
+.combined-age-group>p{margin:0 0 10px}
+.combined-sources{margin:14px 0 0}
+.combined-sources a{color:var(--teal);font-weight:650}
+@media(max-width:560px){.combined-population-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* Kontrol tema tersedia pada desktop dan layar kecil. */
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

@@ -169,11 +169,76 @@
     if (!rows.length) return emptyRow(cols,"Belum ada pemeriksaan","Catatan akan muncul setelah pengukuran disimpan.");
     return rows.map(e=>{const p=patient(e.patientId);return `<tr><td>${utils.formatDate(e.examDate)}</td><td>${p?patientCell(p):status("Relasi pasien tidak valid","status-alert")}</td><td>${e.weightKg??"—"} kg / ${e.lengthHeightCm??"—"} cm</td><td>${status(utils.qualityLabel(e.dataValidationStatus),qualityClass(e.dataValidationStatus))}</td><td><button class="button button-quiet" data-action="profile" data-id="${esc(e.patientId)}">Buka pasien →</button></td></tr>`;}).join("");
   }
+  const combinedIndexes = {
+    under5:["weight_for_age","height_for_age_under5","weight_for_length_height","muac_for_age","head_circumference_for_age","bmi_for_age_under5"],
+    school:["bmi_for_age_5_19","height_for_age_5_19"]
+  };
+  function latestPatientEvaluations() {
+    if(!growthEngine)return [];
+    return state.patients.flatMap(p=>{
+      const latest=examsFor(p.id)[0];
+      if(!latest)return [];
+      const evaluation=growthEngine.evaluateExam(p,latest);
+      if(!evaluation.age?.valid)return [];
+      const ageMonths=evaluation.age.ageMonths;
+      const rejected=latest.dataValidationStatus==="failed_validation"||latest.verificationStatus==="failed_validation";
+      const usableEvaluation=rejected?{...evaluation,results:evaluation.results.map(result=>({...result,zScore:null,category:null,validityStatus:"failed_validation",reason:"measurement_failed_validation"}))}:evaluation;
+      return [{patient:p,exam:latest,evaluation:usableEvaluation,ageMonths,group:ageMonths<60?"under5":ageMonths<228?"school":"outOfRange"}];
+    });
+  }
+  function combinedCategorySummary(cohort,indexTypes) {
+    const entries=cohort.map(item=>({item,results:new Map(item.evaluation.results.map(result=>[result.indexType,result]))}));
+    const rows=indexTypes.map(indexType=>{
+      const sample=entries.map(entry=>entry.results.get(indexType)).find(Boolean);
+      const definition=window.GrowthReferenceData?.indexDefinitions?.[indexType];
+      const label=sample?.label||definition?.label||indexType;
+      const applicable=entries.map(entry=>entry.results.get(indexType)).filter(Boolean);
+      const measured=applicable.filter(result=>result.validityStatus==="valid"&&Number.isFinite(result.zScore));
+      let bands;
+      if(!measured.length){
+        bands=["Belum ada Z-score valid"];
+      }else if(measured.some(result=>result.category)){
+        const labels=[...new Set(measured.map(result=>result.category||"Z-score tersedia; kategori tidak ditetapkan"))];
+        bands=labels.map(category=>{
+          const count=measured.filter(result=>(result.category||"Z-score tersedia; kategori tidak ditetapkan")===category).length;
+          return `${esc(category)}: <strong>${count}</strong> (${measured.length?Math.round(count/measured.length*100):0}%)`;
+        });
+      }else{
+        const parts=[
+          ["Z < −2 SD",result=>result.zScore < -2],
+          ["−2 hingga +2 SD",result=>result.zScore >= -2&&result.zScore <= 2],
+          ["Z > +2 SD",result=>result.zScore > 2]
+        ];
+        bands=parts.map(([label,predicate])=>{const count=measured.filter(predicate).length;return `${label}: <strong>${count}</strong> (${measured.length?Math.round(count/measured.length*100):0}%)`;});
+      }
+      const unavailable=Math.max(0,cohort.length-measured.length);
+      const supplementary=["muac_for_age","head_circumference_for_age","height_for_age_5_19"].includes(indexType);
+      return `<tr><td><strong>${esc(label)}</strong>${supplementary?`<div class="subtext">Indikator pelengkap; bukan kategori status gizi nasional.</div>`:""}</td><td>${bands.join("<br>")||"Belum ada Z-score valid"}</td><td>${measured.length} dari ${cohort.length} pasien dapat dihitung<div class="subtext">${unavailable} belum tersedia / tidak dapat dihitung</div></td></tr>`;
+    });
+    return `<div class="table-wrap"><table><thead><tr><th>Indeks</th><th>Ringkasan hasil</th><th>Cakupan data</th></tr></thead><tbody>${rows.join("")||emptyRow(3,"Belum ada pasien dalam kelompok ini","Pasien akan diringkas setelah memiliki pemeriksaan.")}</tbody></table></div>`;
+  }
+  function combinedAnthropometryMarkup() {
+    if(serviceState!=="ready") return panel("Hasil antropometri gabungan","Interpretasi per kelompok umur dan ringkasan keseluruhan.",`<div class="panel-body"><div class="empty-state"><strong>Data belum siap diringkas</strong><p>Ringkasan akan muncul setelah data pasien dan pemeriksaan berhasil dimuat.</p></div></div>`);
+    const evaluated=latestPatientEvaluations();
+    const under5=evaluated.filter(item=>item.group==="under5");
+    const school=evaluated.filter(item=>item.group==="school");
+    const outOfRange=evaluated.filter(item=>item.group==="outOfRange");
+    const withoutExam=state.patients.filter(p=>!examsFor(p.id).length).length;
+    const withExam=state.patients.length-withoutExam;
+    const unaged=state.patients.filter(p=>examsFor(p.id).length&&!evaluated.some(item=>item.patient.id===p.id)).length;
+    const overall=`<div class="panel-body"><div class="stats-grid combined-population-stats"><div class="stat-card"><div class="stat-top">Semua profil</div><div class="stat-value">${state.patients.length}</div></div><div class="stat-card"><div class="stat-top">Dengan pemeriksaan</div><div class="stat-value">${withExam}</div></div><div class="stat-card"><div class="stat-top">Usia &lt;5 tahun</div><div class="stat-value">${under5.length}</div></div><div class="stat-card"><div class="stat-top">Usia 5–&lt;19 tahun</div><div class="stat-value">${school.length}</div></div></div>
+      <p class="subtext">Ringkasan keseluruhan menggunakan satu pemeriksaan terbaru per pasien. ${withoutExam} pasien belum memiliki pemeriksaan; ${unaged} belum dapat dikelompokkan karena umur pada pemeriksaan tidak valid; ${outOfRange.length} berada di luar cakupan usia standar anak yang ditampilkan. Persentase tiap kategori dihitung dari pasien dengan Z-score valid pada indeks tersebut. Distribusi tidak digabung menjadi satu diagnosis.</p>
+      <section class="combined-age-group"><h3 class="combined-subheading">Interpretasi usia di bawah 5 tahun <span>(${under5.length} pasien)</span></h3><p class="subtext">BB/U, PB/TB/U, BB/PB atau BB/TB, dan IMT/U mengikuti standar antropometri Indonesia. LiLA/U serta LK/U adalah indikator pelengkap dan tidak diberi label kategori status gizi nasional.</p>${combinedCategorySummary(under5,combinedIndexes.under5)}</section>
+      <section class="combined-age-group"><h3 class="combined-subheading">Interpretasi usia 5 sampai kurang dari 19 tahun <span>(${school.length} pasien)</span></h3><p class="subtext">IMT/U menjadi indeks klasifikasi status gizi Permenkes bagi usia 5–18 tahun. TB/U disertakan sebagai indikator pemantauan pertumbuhan WHO; hasilnya bukan kategori status gizi Permenkes.</p>${combinedCategorySummary(school,combinedIndexes.school)}</section>
+      <p class="subtext combined-sources">Acuan: <a href="https://jdih.kemkes.go.id/storage/documents/pdfs/2020permenkes002.pdf" target="_blank" rel="noreferrer">Permenkes RI No. 2 Tahun 2020</a> dan <a href="https://www.who.int/tools/growth-reference-data-for-5to19-years" target="_blank" rel="noreferrer">WHO Growth Reference 5–19 tahun</a>.</p></div>`;
+    return panel("Hasil antropometri gabungan","Interpretasi per kelompok umur dan ringkasan keseluruhan dari data terbaru tiap pasien.",overall);
+  }
   function dashboard() {
     const recent=examsFor(null).slice(0,5);
     return `${heading("Dashboard pemantauan antropometri",isProduction()?`Kelola profil dan telusuri pengukuran longitudinal dari ${esc(backendLabel())}.`:"Kelola profil pasien demo dan telusuri pengukuran longitudinal.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`)}
       ${demoNote("MODE DEMONSTRASI — DATA SIMULASI","Semua pasien dan pemeriksaan di aplikasi ini sintetis, terpisah dari data pasien nyata, dan belum terhubung ke RME.")}
       <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Snapshot antropometri valid</div><div class="stat-value">${state.exams.filter(e=>e.anthropometryCalculation?.results?.some(r=>r.validityStatus==="valid")).length}</div><div class="stat-foot">Perhitungan layar memakai WHO LMS aktif</div></div></div>
+      ${combinedAnthropometryMarkup()}
       <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Daftar pasien</strong><span>Cari dan buka profil</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}${panel(isProduction()?`Penyimpanan ${esc(backendLabel())}`:"Penyimpanan demo","Adapter data aktif",`<div class="panel-body"><p class="muted">${esc(repo.adapterName)}. ${isProduction()?`Perubahan dikirim ke ${esc(backendLabel())}; akses dan audit dikelola oleh backend.`:"Perubahan disimpan di localStorage demo browser ini, dengan jejak audit lokal untuk pembuatan dan koreksi. Ini bukan penyimpanan klinis."}</p><button class="button button-secondary" data-action="audit">Lihat jejak perubahan</button></div>`)}</div></div>`;
   }
   function patientsPage() {
