@@ -5,6 +5,7 @@
   const Repository = window.AnthropometryRepository;
   const content = document.getElementById("app-content");
   const breadcrumb = document.getElementById("breadcrumb-current");
+  const backButton = document.getElementById("back-button");
   const sidebar = document.getElementById("sidebar");
   const toast = document.getElementById("toast");
   const titles = {dashboard:"Dashboard",patients:"Daftar Pasien",profile:"Profil Pasien",patientNew:"Pasien Baru",exam:"Pemeriksaan Baru",results:"Detail Pemeriksaan",growth:"Kurva Pertumbuhan",history:"Riwayat Pemeriksaan",reports:"Ringkasan Laporan"};
@@ -58,6 +59,7 @@
   let serviceState = "loading", serviceError = "", serviceCode = "";
   let state = {patients:[],exams:[],interpretations:[],auditEvents:[]};
   let currentPage = "dashboard", selectedPatientId = "", searchTerm = "", historyFilterPatientId = "", currentExamId = "", currentGrowthIndex = "weight_for_age";
+  const pageHistory = [];
   let toastTimer;
 
   const patient = id => state.patients.find(p => p.id === id) || null;
@@ -155,8 +157,10 @@
     if (repo.mode === "production") return `${action} dikonfirmasi ${backendLabel()}.`;
     return repo.persistenceMode === "memory-only" ? `${action} hanya tersimpan sementara di memori demo; tidak permanen.` : `${action} tersimpan di localStorage demo browser ini; belum dikirim ke RME.`;
   }
-  function setPage(page) {
+  function setPage(page,{fromHistory=false}={}) {
+    if(page!==currentPage&&!fromHistory)pageHistory.push(currentPage);
     currentPage=page; breadcrumb.textContent=titles[page]||"Dashboard";
+    backButton.disabled=currentPage==="dashboard"&&pageHistory.length===0;
     document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page||(page==="profile"&&b.dataset.page==="patients")||(["results","growth"].includes(page)&&b.dataset.page==="history")||page==="patientNew"&&b.dataset.page==="patients"));
     sidebar.classList.remove("open"); render(); if(page==="exam")updateExamAgeAndSummary(); content.focus({preventScroll:true}); window.scrollTo({top:0,behavior:"smooth"});
   }
@@ -465,6 +469,11 @@
       if(typeof window.confirm!=="function"||!window.confirm(confirmation))return;
     }
     try {
+      if(next==="appBack"){
+        if(isProduction()){serviceState="loading";render();await refresh();}
+        const previousPage=pageHistory.pop()||"dashboard";
+        setPage(previousPage,{fromHistory:true});return;
+      }
       if(isProduction() && ["profile","exam","patientNew","editPatient","deletePatient","patients","dashboard","reports","growth","history","examDetail","results","editExam","audit","growthPoint"].includes(next)) { serviceState="loading";render();await refresh(); }
       if(next==="profile") { selectedPatientId=id||""; currentExamId=""; historyFilterPatientId=""; setPage("profile"); return; }
       if(next==="exam") { if(id&&patient(id))selectedPatientId=id; currentExamId=""; setPage("exam"); return; }
