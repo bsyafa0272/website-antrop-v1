@@ -9,5 +9,5 @@ window.SupabaseConfig = Object.freeze({
   publicDemo: true,
   url: "https://dlimocrafoflksmuzezd.supabase.co",
   anonKey: "sb_publishable_z4syMpY9T_eBWHP-J5wumA_LlmtI62b",
-  organizationId: "97d31d90-6c36-4d93-ad42-865daa5346ff"
+  organizationId: "d7196f9f-36b7-4e12-9d0f-136c27496f61"
 });
