@@ -160,6 +160,7 @@
   function setPage(page,{fromHistory=false}={}) {
     if(page!==currentPage&&!fromHistory)pageHistory.push(currentPage);
     currentPage=page; breadcrumb.textContent=titles[page]||"Dashboard";
+    backButton.hidden=currentPage==="dashboard";
     backButton.disabled=currentPage==="dashboard"&&pageHistory.length===0;
     document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page||(page==="profile"&&b.dataset.page==="patients")||(["results","growth"].includes(page)&&b.dataset.page==="history")||page==="patientNew"&&b.dataset.page==="patients"));
     sidebar.classList.remove("open"); render(); if(page==="exam")updateExamAgeAndSummary(); content.focus({preventScroll:true}); window.scrollTo({top:0,behavior:"smooth"});
