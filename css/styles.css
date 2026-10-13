@@ -182,6 +182,7 @@ html[data-theme="dark"] .button-quiet{color:var(--teal-dark)}
 .button-danger:hover{background:#912018;border-color:#912018}
 .button-danger:focus-visible{outline:3px solid #fca5a5;outline-offset:2px}
 .back-navigation{flex:0 0 auto;padding:7px 10px;font-size:11px}
+.back-navigation[hidden]{display:none!important}
 .back-navigation:disabled{opacity:.55;cursor:default}
 @media(max-width:380px){.back-navigation{width:34px;height:34px;padding:0}.back-label{display:none}}
 html[data-theme="dark"] .quick-action{color:var(--ink)}
