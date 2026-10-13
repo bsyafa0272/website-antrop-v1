@@ -178,6 +178,9 @@ html[data-theme="dark"] .report-header{background:#20384b}
 html[data-theme="dark"] .report-header p{color:#d5e1e8}
 html[data-theme="dark"] .icon-button{background:#172630;color:var(--ink)}
 html[data-theme="dark"] .button-quiet{color:var(--teal-dark)}
+.button-danger{background:#b42318;border:1px solid #b42318;color:#fff}
+.button-danger:hover{background:#912018;border-color:#912018}
+.button-danger:focus-visible{outline:3px solid #fca5a5;outline-offset:2px}
 html[data-theme="dark"] .quick-action{color:var(--ink)}
 @media(max-width:380px){.theme-control select{max-width:82px;padding-left:6px;padding-right:18px;font-size:10px}}
 @media print{html[data-theme="dark"]{color-scheme:light;--ink:#172b3a;--muted:#687987;--line:#e2e9ed;--bg:#f4f7f9;--white:#fff}}

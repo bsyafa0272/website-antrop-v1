@@ -4,7 +4,7 @@ Adapter memakai REST API Supabase tanpa SDK eksternal. `publicDemo: true` mengak
 
 ## Setup proyek
 
-1. Buat proyek Supabase. Jalankan isi `supabase/migrations/20261010000000_anthropometry.sql`, lalu `supabase/migrations/20261011000000_public_synthetic_demo.sql` melalui SQL Editor.
+1. Buat proyek Supabase. Jalankan migrasi secara berurutan: `20261010000000_anthropometry.sql`, `20261011000000_public_synthetic_demo.sql`, lalu `20261013000000_patient_deletion.sql` melalui SQL Editor.
 2. Buat **organisasi khusus demo** dengan tanda publik:
 
    ```sql

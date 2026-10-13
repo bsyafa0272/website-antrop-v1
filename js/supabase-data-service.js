@@ -206,6 +206,11 @@
         if (!rows?.[0]) throw new SupabaseDataError("CONFLICT", "Data pasien berubah di server. Muat ulang sebelum mencoba koreksi.");
         return patientFromRow(rows[0]);
       },
+      async deletePatient(id) {
+        const rows = await request("patients", {method:"DELETE",query:{id:`eq.${id}`,organization_id:`eq.${config.organizationId}`},prefer:"return=representation"});
+        if (!rows?.length) throw new SupabaseDataError("NOT_FOUND", "Pasien tidak ditemukan atau tidak dapat dihapus.");
+        return {id,deletedExams:null};
+      },
       async listExams(patientId = null) {
         const query = {select: "*", order: "exam_date.desc,id.asc", organization_id: `eq.${config.organizationId}`}; if (patientId) query.patient_id = `eq.${patientId}`;
         return (await readAll("exams", query)).map(examFromRow);
@@ -252,7 +257,7 @@
       const unavailable = async () => { throw error; };
       return {adapterName: "supabase-misconfigured", providerLabel: "Supabase", mode: "production", publicDemo: config.publicDemo === true, authRequired: config.publicDemo !== true, isDemo: config.publicDemo === true, persistenceMode: "server-unavailable",
         initialize: unavailable, getSnapshot: unavailable, listPatients: unavailable, getPatient: unavailable,
-        createPatient: unavailable, updatePatient: unavailable, listExams: unavailable, getExam: unavailable,
+        createPatient: unavailable, updatePatient: unavailable, deletePatient: unavailable, listExams: unavailable, getExam: unavailable,
         createExam: unavailable, updateExam: unavailable, listInterpretations: unavailable, listAuditEvents: unavailable,
         getEntityHistory: unavailable, signIn: unavailable, signOut: unavailable, resetDemoData: unavailable};
     }

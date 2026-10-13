@@ -15,7 +15,7 @@ Kunci konfigurasi yang dibutuhkan:
 - `enabled: true`
 - `baseUrl`: origin/path dasar API yang telah disetujui
 - `routes.patients`: koleksi pasien (GET daftar, POST buat)
-- `routes.patient`: satu pasien, dengan parameter template `{patientId}` (GET/PUT)
+- `routes.patient`: satu pasien, dengan parameter template `{patientId}` (GET/PUT/DELETE)
 - `routes.exams`: koleksi pemeriksaan (GET daftar, POST buat; GET dapat menerima query `patientId`)
 - `routes.exam`: satu pemeriksaan, dengan parameter template `{examId}` (GET/PUT)
 - `routes.interpretations` dan `routes.audit`: opsional untuk endpoint daftar hasil/audit yang sesuai kontrak RME
@@ -48,6 +48,8 @@ Adapter mengharapkan JSON, baik respons langsung maupun dibungkus sebagai `{ "da
 Identitas yang dibutuhkan UI antara lain `id`, `name`, `medicalRecordNumber`, `birthDate`, `sexAtBirth` pada pasien, serta `id`, `patientId`, `rmeVisitId`, `examDate`, nilai ukur, `measurementType`, `edemaStatus` (`unknown`, `absent`, `present`), status, dan metadata versi pada pemeriksaan. Status edema harus disimpan bersama tanggal pemeriksaan karena memengaruhi indeks berbasis berat badan.
 
 Pemeriksaan harus mengirim `patientId` dan `rmeVisitId` secara eksplisit. Respons POST/PUT pemeriksaan juga wajib mengembalikan `anthropometryCalculation` dengan `algorithmVersion`, `referenceSchemaVersion`, `calculatedAt`, dan `results`. Nilai Z-score/kategori harus null ketika input atau referensi tidak memenuhi syarat. Perhitungan server harus menahan BB/U, IMT/U, dan BB/PB/TB bila edema ditemukan atau statusnya belum diketahui; TB/U, LK/U, dan LiLA/U tidak bergantung pada status edema. Jangan menganggap perhitungan dari browser sebagai keputusan klinis atau mempercayai hasil frontend tanpa perhitungan ulang server. Adapter memeriksa provenance ini serta ID pemeriksaan/pasien/kunjungan pada respons simpan; jika tidak ada, operasi tidak dilaporkan sebagai sukses lengkap. **Backend wajib** memastikan bahwa kunjungan memang milik pasien tersebut, bahwa pengguna berhak mengakses pasien/kunjungan, serta bahwa validasi klinis dan integritas foreign-key berlaku dalam transaksi server. Pemeriksaan tanpa kunjungan hanya diizinkan jika kebijakan RME menyatakan demikian.
+
+Operasi `DELETE routes.patient/{patientId}` menghapus profil pasien beserta seluruh pemeriksaan terkait secara atomik, memeriksa otorisasi pada backend, dan mencatat peristiwa penghapusan pada audit trail. Jangan menerima penghapusan pasien bila layanan RME tidak dapat menjamin penghapusan relasi tersebut secara transaksional.
 
 ## Autentikasi, otorisasi, dan audit
 

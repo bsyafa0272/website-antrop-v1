@@ -109,6 +109,7 @@
       async getPatient(id) { return clone(await request("GET", config.routes.patient, {params: {patientId: id}, retryRead: true})); },
       async createPatient(input) { return clone(await request("POST", config.routes.patients, {body: input})); },
       async updatePatient(id, input) { return clone(await request("PUT", config.routes.patient, {params: {patientId: id}, body: input, headers: input.version ? {"If-Match": String(input.version)} : {}})); },
+      async deletePatient(id) { return clone(await request("DELETE", config.routes.patient, {params: {patientId: id}})); },
       async listExams(patientId = null) { const r = await request("GET", config.routes.exams, {query: {patientId}, retryRead: true}); return clone(r?.items || r || []); },
       async getExam(id) { return clone(await request("GET", config.routes.exam, {params: {examId: id}, retryRead: true})); },
       async createExam(input) {
@@ -141,7 +142,7 @@
       const unavailable = async () => { throw error; };
       return {adapterName: "rme-api-misconfigured", mode: "production", isDemo: false, persistenceMode: "server-unavailable",
         initialize: unavailable, getSnapshot: unavailable, listPatients: unavailable, getPatient: unavailable,
-        createPatient: unavailable, updatePatient: unavailable, listExams: unavailable, getExam: unavailable,
+        createPatient: unavailable, updatePatient: unavailable, deletePatient: unavailable, listExams: unavailable, getExam: unavailable,
         createExam: unavailable, updateExam: unavailable, listInterpretations: unavailable, listAuditEvents: unavailable,
         getEntityHistory: unavailable, resetDemoData: unavailable};
     }

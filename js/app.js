@@ -41,13 +41,13 @@
   const unavailableProductionAdapter = () => {
     const fail = async () => { throw new Error("Layanan integrasi RME tidak termuat. Mode demo dinonaktifkan karena konfigurasi produksi aktif."); };
     return {adapterName:"rme-api-unavailable",mode:"production",isDemo:false,persistenceMode:"server-unavailable",
-      initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,
+      initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,deletePatient:fail,
       listExams:fail,getExam:fail,createExam:fail,updateExam:fail,listInterpretations:fail,listAuditEvents:fail,getEntityHistory:fail,resetDemoData:fail};
   };
   const supabaseUnavailableAdapter = () => {
     const fail = async () => { throw new Error("Adapter Supabase tidak termuat. Mode demo dinonaktifkan karena konfigurasi Supabase aktif."); };
     return {adapterName:"supabase-unavailable",providerLabel:"Supabase",mode:"production",isDemo:false,persistenceMode:"server-unavailable",
-      initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,
+      initialize:fail,getSnapshot:fail,listPatients:fail,getPatient:fail,createPatient:fail,updatePatient:fail,deletePatient:fail,
       listExams:fail,getExam:fail,createExam:fail,updateExam:fail,listInterpretations:fail,listAuditEvents:fail,getEntityHistory:fail,signIn:fail,signOut:fail,resetDemoData:fail};
   };
   const repo = integrationConfig?.enabled === true
@@ -271,7 +271,7 @@
   }
   function patientNewPage() {
     const editing = patient(selectedPatientId);
-    return `${heading(editing?"Koreksi profil pasien":"Tambah profil pasien",editing?"Perbarui profil yang sama; koreksi dicatat pada jejak audit.":repo.publicDemo?"Buat profil sintetis di ruang demo publik Supabase.":isProduction()?`Buat profil melalui layanan ${esc(backendLabel())} yang telah dikonfigurasi.`:"Buat identitas simulasi dengan ID internal yang dibuat otomatis.")}${demoNote("Ruang data demo","Gunakan data sintetis saja. Pengunjung demo publik dapat melihat dan mengoreksi profil yang dibuat.")}
+    return `${heading(editing?"Edit profil pasien":"Tambah profil pasien",editing?"Perubahan profil dicatat pada jejak audit.":repo.publicDemo?"Buat profil sintetis di ruang demo publik Supabase.":isProduction()?`Buat profil melalui layanan ${esc(backendLabel())} yang telah dikonfigurasi.`:"Buat identitas simulasi dengan ID internal yang dibuat otomatis.")}${demoNote("Ruang data demo","Gunakan data sintetis saja. Pengunjung demo publik dapat melihat dan mengedit profil yang dibuat.")}
       <form id="patient-form" class="panel" data-edit-id="${esc(editing?.id||"")}">${editing?.version?`<input type="hidden" name="version" value="${esc(editing.version)}">`:""}<div class="form-section"><h2 class="section-heading">Identitas pasien</h2><p class="section-help">Kolom bertanda * wajib diisi.</p><div class="form-grid">
       <div class="field"><label for="patient-name">Nama pasien *</label><input id="patient-name" name="name" maxlength="120" value="${esc(editing?.name||"")}" required></div>
       <div class="field"><label for="patient-rm">${isProduction()?"Nomor rekam medis":"Nomor rekam medis demo"} *</label><input id="patient-rm" name="medicalRecordNumber" maxlength="64" value="${esc(editing?.medicalRecordNumber||"")}" required></div>
@@ -281,7 +281,7 @@
       <div class="field"><label for="ga-days">Tambahan hari gestasi</label><input id="ga-days" name="gestationDays" type="number" min="0" max="6" step="1" value="${esc(editing?.gestationalAgeAtBirth?.days??0)}"></div>
       <div class="field"><label for="patient-guardian">Nama wali (opsional)</label><input id="patient-guardian" name="guardianName" maxlength="120" value="${esc(editing?.guardianName||"")}"></div>
       <div class="field" style="grid-column:1/-1"><label for="patient-notes">Informasi klinis tambahan yang relevan (opsional)</label><textarea id="patient-notes" name="clinicalNotes" maxlength="1000" placeholder="${repo.publicDemo?"Catatan sintetis untuk demo saja.":isProduction()?`Catatan sesuai kebijakan ${backendLabel()}.`:"Hanya catatan sintetis untuk pengujian. Hindari data identitas nyata."}">${esc(editing?.clinicalNotes||"")}</textarea></div>
-      </div></div><div class="form-actions"><button class="button button-secondary" type="button" data-action="${editing?"profile":"patients"}" data-id="${esc(editing?.id||"")}">Batal</button><button class="button button-primary" type="submit">${editing?"Simpan koreksi profil":isProduction()?"Simpan profil":"Simpan profil demo"}</button></div></form>`;
+      </div></div><div class="form-actions"><button class="button button-secondary" type="button" data-action="${editing?"profile":"patients"}" data-id="${esc(editing?.id||"")}">Batal</button><button class="button button-primary" type="submit">${editing?"Simpan perubahan":isProduction()?"Simpan profil":"Simpan profil demo"}</button></div></form>`;
   }
   function profilePage() {
     const p=patient(selectedPatientId);
@@ -298,7 +298,7 @@
     const growthOptionsMarkup=growthOptions.map(o=>`<option value="${esc(o.value)}" ${o.value===currentGrowthIndex?"selected":""}>${esc(o.label)}</option>`).join("");
     const profileGrowthPanel=panel("Kurva hasil pengukuran",`${rows.length} pemeriksaan · grafik mengikuti indeks yang dipilih`,
       `<div class="panel-body"><div class="growth-controls"><div class="field"><label for="profile-growth-index">Indeks antropometri</label><select id="profile-growth-index" ${growthOptions.length?"":"disabled"}>${growthOptionsMarkup||`<option value="">Belum ada data pemeriksaan</option>`}</select></div></div><div class="growth-reference-meta mt-16"><strong>${growthModel?.referenceAvailable?"Kurva rujukan tervalidasi tersedia":"Titik pengukuran pasien"}</strong><span>${growthModel?.referenceAvailable?esc(growthModel.referenceSource):"Garis hanya menghubungkan hasil ukur; kurva WHO/Z-score belum tersedia."}</span></div>${growthModel?.warnings?.length?`<div class="note-banner mt-16"><div>${growthModel.warnings.map(esc).join(" ")}</div></div>`:""}${growthChart?growthChart.renderSvg(growthModel):`<div class="growth-empty">Modul grafik belum tersedia.</div>`}${growthInterpretationMarkup(selectedGrowthEvaluation,currentGrowthIndex,selectedExam?.examDate||latest?.examDate)}<p class="subtext">Sumbu X: usia saat pemeriksaan. Sumbu Y: ${esc(growthModel?.label||"nilai indeks")} (${esc(growthModel?.unit||"satuan")}). Grafik menampilkan nilai pengukuran tersimpan.</p></div>`);
-    return `${heading("Profil pasien","Identitas, riwayat pemeriksaan, dan jejak perubahan.",`<button class="button button-secondary" data-action="growth" data-id="${esc(p.id)}">Kurva longitudinal</button> <button class="button button-secondary" data-action="editPatient" data-id="${esc(p.id)}">Koreksi profil</button> <button class="button button-primary" data-action="exam" data-id="${esc(p.id)}">＋ Catat pemeriksaan</button>`)}${demoNote("Profil simulasi","Data profil dan pemeriksaan adalah sintetis. Identitas pencatat tidak tersedia karena autentikasi belum diimplementasikan.")}
+    return `${heading("Profil pasien","Identitas, riwayat pemeriksaan, dan jejak perubahan.",`<button class="button button-secondary" data-action="growth" data-id="${esc(p.id)}">Kurva longitudinal</button> <button class="button button-secondary" data-action="editPatient" data-id="${esc(p.id)}">Edit</button> <button class="button button-primary" data-action="exam" data-id="${esc(p.id)}">＋ Catat pemeriksaan</button> <button class="button button-danger" data-action="deletePatient" data-id="${esc(p.id)}">Hapus pasien</button>`)}${demoNote("Profil simulasi","Data profil dan pemeriksaan adalah sintetis. Identitas pencatat tidak tersedia karena autentikasi belum diimplementasikan.")}
       <section class="panel"><div class="panel-body"><div class="profile-header"><div class="profile-avatar">${esc(p.name.split(/\s+/).map(x=>x[0]).slice(0,2).join(""))}</div><div class="profile-meta"><h2>${esc(p.name)}</h2><p>${esc(p.medicalRecordNumber)} · ${esc(utils.sexLabel(p.sexAtBirth))} · ${utils.ageAt(p.birthDate,utils.localToday())}</p>${isProduction()?status(repo.publicDemo?"Data demo publik":"Data tersimpan di backend"):status("Identitas simulasi") }<div class="subtext">ID pasien: ${esc(p.id)}</div></div></div><div class="profile-grid"><div class="detail-tile"><span>Tanggal lahir</span><strong>${utils.formatDate(p.birthDate)}</strong></div><div class="detail-tile"><span>Nomor RM</span><strong>${esc(p.medicalRecordNumber)}</strong></div><div class="detail-tile"><span>Usia gestasi saat lahir</span><strong>${p.gestationalAgeAtBirth?`${p.gestationalAgeAtBirth.weeks} minggu ${p.gestationalAgeAtBirth.days} hari`:"Tidak dicatat"}</strong></div><div class="detail-tile"><span>Jumlah pemeriksaan</span><strong>${rows.length}</strong></div></div><div class="mt-16"><strong>Catatan tambahan</strong><p class="muted">${esc(p.clinicalNotes||"Tidak ada catatan tambahan.")}</p></div><p class="subtext">Dibuat ${utils.formatDateTime(p.createdAt)} · Diubah ${utils.formatDateTime(p.updatedAt)}</p></div></section>
       ${profileGrowthPanel}
       ${panel("Interpretasi pemeriksaan terbaru",latest?`Pemeriksaan ${utils.formatDate(latest.examDate)} · hasil mesin dan cakupan indeks`:"Belum ada hasil untuk ditampilkan",latestEvaluation?growthResultsMarkup(latestEvaluation):`<div class="panel-body"><p class="muted">Simpan pemeriksaan antropometri untuk melihat nilai yang dapat dihitung dan status interpretasinya.</p></div>`)}
@@ -316,7 +316,7 @@
     const initialGrowthEvaluation=assigned&&growthEngine?growthEngine.evaluateExam(assigned,{...formExam,examDate,weightKg:formExam?.weightKg??null,lengthHeightCm:formExam?.lengthHeightCm??null,measurementType:formExam?.measurementType||"",edemaStatus:formExam?.edemaStatus||"unknown",headCircumferenceCm:formExam?.headCircumferenceCm??null,midUpperArmCircumferenceCm:formExam?.midUpperArmCircumferenceCm??null}):null;
     const agePanel=assigned ? `<div class="detail-tile"><span>Usia kronologis saat pemeriksaan</span><strong id="age-display" aria-live="polite">${esc(utils.formatAge(age))}</strong><div class="subtext" id="age-days">${age?.valid?`Usia tepat: ${age.totalDays.toLocaleString("id-ID")} hari`:"Periksa tanggal lahir dan pemeriksaan."}</div></div>` : `<div class="detail-tile"><span>Usia kronologis</span><strong id="age-display">Pilih pasien terlebih dahulu</strong><div class="subtext" id="age-days">Usia dihitung berdasarkan profil pasien dan tanggal pemeriksaan.</div></div>`;
     return `${heading(formExam?"Koreksi catatan pemeriksaan":"Pemeriksaan antropometri",formExam?"Koreksi memperbarui catatan yang sama dan mencatat perubahan di audit.":"Formulir terhubung ke profil pasien; tanggal pemeriksaan menentukan usia yang ditampilkan.")}${demoNote("Data simulasi","Jangan masukkan data pasien nyata. Identitas diambil dari profil demo. Usia yang ditampilkan adalah usia kronologis; koreksi usia prematur tidak diterapkan otomatis.")}
-      <form id="exam-form" class="panel" data-edit-id="${esc(formExam?.id||"")}" data-birth-date="${esc(dob)}">${formExam?.version?`<input type="hidden" name="version" value="${esc(formExam.version)}">`:""}<div class="form-section"><h2 class="section-heading">1. Data dasar dan usia</h2><p class="section-help">Identitas dan tanggal lahir dibaca dari profil pasien; ubahnya melalui koreksi profil bila ada kesalahan.</p><div class="form-grid">
+      <form id="exam-form" class="panel" data-edit-id="${esc(formExam?.id||"")}" data-birth-date="${esc(dob)}">${formExam?.version?`<input type="hidden" name="version" value="${esc(formExam.version)}">`:""}<div class="form-section"><h2 class="section-heading">1. Data dasar dan usia</h2><p class="section-help">Identitas dan tanggal lahir dibaca dari profil pasien; ubah melalui halaman profil bila ada kesalahan.</p><div class="form-grid">
       <div class="field"><label for="exam-patient">Pasien anak *</label><select id="exam-patient" name="patientId" required ${formExam?"disabled":""}><option value="">Pilih pasien…</option>${patientOptions}</select>${formExam?`<input type="hidden" name="patientId" value="${esc(formExam.patientId)}">`:""}</div>
       <div class="field"><label>Nomor rekam medis</label><input id="exam-rm" value="${esc(assigned?.medicalRecordNumber||"")}" readonly aria-readonly="true" placeholder="Terisi dari profil pasien"></div>
       <div class="field"><label>Nama pasien</label><input id="exam-name" value="${esc(assigned?.name||"")}" readonly aria-readonly="true" placeholder="Terisi dari profil pasien"></div>
@@ -457,12 +457,26 @@
     }
     const action=e.target.closest("[data-action]"); if(!action)return;
     const id=action.dataset.id, next=action.dataset.action;
+    if(next==="deletePatient"){
+      const target=patient(id);
+      if(!target){notify("Pasien tidak ditemukan.");return;}
+      const examCount=examsFor(id).length;
+      const confirmation=`Hapus pasien ${target.name} beserta ${examCount} pemeriksaan yang tercatat? Tindakan ini tidak dapat dibatalkan.`;
+      if(typeof window.confirm!=="function"||!window.confirm(confirmation))return;
+    }
     try {
-      if(isProduction() && ["profile","exam","patientNew","editPatient","patients","dashboard","reports","growth","history","examDetail","results","editExam","audit","growthPoint"].includes(next)) { serviceState="loading";render();await refresh(); }
+      if(isProduction() && ["profile","exam","patientNew","editPatient","deletePatient","patients","dashboard","reports","growth","history","examDetail","results","editExam","audit","growthPoint"].includes(next)) { serviceState="loading";render();await refresh(); }
       if(next==="profile") { selectedPatientId=id||""; currentExamId=""; historyFilterPatientId=""; setPage("profile"); return; }
       if(next==="exam") { if(id&&patient(id))selectedPatientId=id; currentExamId=""; setPage("exam"); return; }
       if(next==="patientNew") { selectedPatientId=""; setPage("patientNew"); return; }
       if(next==="editPatient") { if(!patient(id)) throw new Repository.RepositoryError("NOT_FOUND","Pasien tidak ditemukan."); selectedPatientId=id; setPage("patientNew"); return; }
+      if(next==="deletePatient") {
+        const removed=await repo.deletePatient(id);
+        await refresh();
+        selectedPatientId="";currentExamId="";historyFilterPatientId="";searchTerm="";
+        notify(`Pasien dihapus beserta ${removed?.deletedExams??"seluruh"} riwayat pemeriksaan.`);
+        setPage("patients");return;
+      }
       if(next==="patients"||next==="dashboard"||next==="reports"||next==="growth") { if(id&&patient(id))selectedPatientId=id; setPage(next);return; }
       if(next==="history") { historyFilterPatientId=id&&patient(id)?id:"";setPage("history");return; }
       if(next==="examDetail"||next==="results") { currentExamId=id||new URLSearchParams(location.search).get("exam")||""; setPage("examDetail");return; }

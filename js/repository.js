@@ -292,6 +292,19 @@
         }
         return clone(target);
       },
+      async deletePatient(id) {
+        const current = requirePatient(id);
+        const draft = clone(state);
+        const removedExams = draft.exams.filter(item => item.patientId === id);
+        for (const item of removedExams) auditEvent(draft, {entityType:"exam",entityId:item.id,action:"DELETED",before:item,changedFields:Object.keys(item)});
+        auditEvent(draft, {entityType:"patient",entityId:id,action:"DELETED",before:current,changedFields:Object.keys(current)});
+        draft.patients = draft.patients.filter(item => item.id !== id);
+        draft.exams = draft.exams.filter(item => item.patientId !== id);
+        const removedExamIds = new Set(removedExams.map(item => item.id));
+        draft.interpretations = draft.interpretations.filter(item => !removedExamIds.has(item.examId));
+        persistDraft(draft);
+        return {id,deletedExams:removedExams.length};
+      },
 
       async listExams(patientId = null) {
         if (patientId) requirePatient(patientId);
