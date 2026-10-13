@@ -185,6 +185,8 @@ html[data-theme="dark"] .button-quiet{color:var(--teal-dark)}
 .back-navigation[hidden]{display:none!important}
 .back-navigation:disabled{opacity:.55;cursor:default}
 @media(max-width:380px){.back-navigation{width:34px;height:34px;padding:0}.back-label{display:none}}
+.brand{width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.brand:focus-visible{outline:2px solid #80cbc4;outline-offset:2px;border-radius:10px}
 html[data-theme="dark"] .quick-action{color:var(--ink)}
 @media(max-width:380px){.theme-control select{max-width:82px;padding-left:6px;padding-right:18px;font-size:10px}}
 @media print{html[data-theme="dark"]{color-scheme:light;--ink:#172b3a;--muted:#687987;--line:#e2e9ed;--bg:#f4f7f9;--white:#fff}}
