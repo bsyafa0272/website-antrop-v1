@@ -192,3 +192,5 @@ h1,h2,h3,h4,.brand strong,.panel-title,.section-heading,.page-heading .eyebrow,.
 html[data-theme="dark"] .quick-action{color:var(--ink)}
 @media(max-width:380px){.theme-control select{max-width:82px;padding-left:6px;padding-right:18px;font-size:10px}}
 @media print{html[data-theme="dark"]{color-scheme:light;--ink:#172b3a;--muted:#687987;--line:#e2e9ed;--bg:#f4f7f9;--white:#fff}}
+.growth-category-abnormal{color:var(--red);font-weight:700}
+.growth-interpretation-score.growth-category-abnormal{color:var(--red)}
