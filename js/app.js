@@ -120,7 +120,8 @@
     else description="Z-score belum tersedia untuk pemeriksaan ini; periksa kelengkapan data dan status dataset rujukan.";
     const score=Number.isFinite(result.zScore)?`Z-score ${result.zScore>0?"+":""}${result.zScore.toFixed(2)} SD`:"Z-score belum tersedia";
     const category=result.category?`Kategori: ${result.category}.`:"Kategori otomatis tidak tersedia untuk indeks ini.";
-    return `<section class="growth-interpretation" aria-live="polite"><div><strong>Interpretasi singkat · ${esc(result.label)}</strong>${examDate?`<span class="growth-interpretation-date">Pengukuran ${utils.formatDate(examDate)}</span>`:""}<p>${esc(description)}</p></div><span class="growth-interpretation-score ${growthCategoryClass(result)}">${esc(score)}${result.category?` · ${esc(result.category)}`:""}</span><small>Hasil skrining berdasarkan rujukan WHO; ${esc(category)} Tinjauan tenaga kesehatan tetap diperlukan.</small></section>`;
+    const abnormal=growthCategoryClass(result)!=="";
+    return `<section class="growth-interpretation" aria-live="polite"><div><strong>Interpretasi singkat · ${esc(result.label)}</strong>${examDate?`<span class="growth-interpretation-date">Pengukuran ${utils.formatDate(examDate)}</span>`:""}<p>${esc(description)}</p></div><span class="growth-interpretation-score ${abnormal?"growth-category-abnormal":""}">${abnormal?`<svg class="growth-warning-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>`:""}${esc(score)}${result.category?` · ${esc(result.category)}`:""}</span><small>Hasil skrining berdasarkan rujukan WHO; ${esc(category)} Tinjauan tenaga kesehatan tetap diperlukan.</small></section>`;
   }
   function liveGrowthChartMarkup(p, draft) {
     if(!p||!growthChart||!growthEngine)return `<div class="growth-empty">Pilih pasien untuk melihat kurva.</div>`;

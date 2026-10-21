@@ -194,3 +194,5 @@ html[data-theme="dark"] .quick-action{color:var(--ink)}
 @media print{html[data-theme="dark"]{color-scheme:light;--ink:#172b3a;--muted:#687987;--line:#e2e9ed;--bg:#f4f7f9;--white:#fff}}
 .growth-category-abnormal{color:var(--red);font-weight:700}
 .growth-interpretation-score.growth-category-abnormal{color:var(--red)}
+.growth-interpretation-score{font-size:13px;display:inline-flex;align-items:center;justify-content:flex-end;gap:5px}.growth-warning-icon{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:560px){.growth-interpretation-score{justify-content:flex-start}}
