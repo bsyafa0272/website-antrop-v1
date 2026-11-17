@@ -8,7 +8,7 @@
   const backButton = document.getElementById("back-button");
   const sidebar = document.getElementById("sidebar");
   const toast = document.getElementById("toast");
-  const titles = {dashboard:"Dashboard",patients:"Pasien & Pemeriksaan",profile:"Profil Pasien",patientNew:"Pasien Baru",exam:"Pemeriksaan Baru",results:"Detail Pemeriksaan",examDetail:"Detail Pemeriksaan",growth:"Kurva Pertumbuhan",history:"Pasien & Pemeriksaan",reports:"Ringkasan Laporan"};
+  const titles = {dashboard:"Dashboard",patients:"Pasien",profile:"Profil Pasien",patientNew:"Pasien Baru",exam:"Pemeriksaan Baru",results:"Detail Pemeriksaan",examDetail:"Detail Pemeriksaan",growth:"Kurva Pertumbuhan",history:"Pasien",reports:"Ringkasan Laporan"};
   const esc = utils.escape;
   const themeStorageKey = "pediatricAnthropometry.theme.v1";
   const themeSelect = document.getElementById("theme-select");
@@ -184,7 +184,7 @@
     document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page||(page==="profile"&&b.dataset.page==="patients")||page==="patientNew"&&b.dataset.page==="patients"));
     sidebar.classList.remove("open"); render(); if(page==="exam")updateExamAgeAndSummary(); content.focus({preventScroll:true}); window.scrollTo({top:0,behavior:"smooth"});
   }
-  function heading(title, subtitle, button="") { return `<div class="page-heading"><div><p class="eyebrow">Pemantauan pertumbuhan anak</p><h1>${title}</h1><p>${subtitle}</p></div>${button}</div>`; }
+  function heading(title, subtitle, button="", {eyebrow=true}={}) { return `<div class="page-heading"><div>${eyebrow?`<p class="eyebrow">Pemantauan pertumbuhan anak</p>`:""}<h1>${title}</h1><p>${subtitle}</p></div>${button}</div>`; }
   function panel(title, subtitle, body, action="") { return `<section class="panel"><div class="panel-header"><div><h2 class="panel-title">${title}</h2>${subtitle?`<p class="panel-subtitle">${subtitle}</p>`:""}</div>${action}</div>${body}</section>`; }
   function note(title, message) { return `<div class="note-banner"><span aria-hidden="true">ⓘ</span><div><strong>${title}</strong>${message}</div></div>`; }
   function patientCell(p) { return `<div class="patient-name">${esc(p.name)}</div><div class="subtext">${esc(p.medicalRecordNumber)} · ${esc(utils.sexLabel(p.sexAtBirth))}</div>`; }
@@ -284,10 +284,10 @@
   }
   function dashboard() {
     const recent=examsFor(null).slice(0,5);
-    return `${heading("Dashboard pemantauan antropometri",isProduction()?`Kelola profil dan telusuri pengukuran longitudinal dari ${esc(backendLabel())}.`:"Kelola profil pasien demo dan telusuri pengukuran longitudinal.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`)}
+    return `${heading("Ringkasan pemantauan","Pantau pasien dan pemeriksaan terbaru.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`,{eyebrow:false})}
       ${demoNote("MODE DEMONSTRASI — DATA SIMULASI","Semua pasien dan pemeriksaan di aplikasi ini sintetis, terpisah dari data pasien nyata, dan belum terhubung ke RME.")}
       <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Pemeriksaan dengan hasil valid</div><div class="stat-value">${validCalculationCount()}</div><div class="stat-foot">Dihitung ulang dari pengukuran dan WHO LMS</div></div></div>
-      <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Pasien &amp; pemeriksaan</strong><span>Cari pasien atau tinjau riwayat</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}${panel(isProduction()?`Penyimpanan ${esc(backendLabel())}`:"Penyimpanan demo","Adapter data aktif",`<div class="panel-body"><p class="muted">${esc(repo.adapterName)}. ${isProduction()?`Perubahan dikirim ke ${esc(backendLabel())}; akses dan audit dikelola oleh backend.`:"Perubahan disimpan di localStorage demo browser ini, dengan jejak audit lokal untuk pembuatan dan koreksi. Ini bukan penyimpanan klinis."}</p><button class="button button-secondary" data-action="audit">Lihat jejak perubahan</button></div>`)}</div></div>`;
+      <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Pasien</strong><span>Cari pasien atau tinjau riwayat</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}</div></div>`;
   }
   function patientListPage() {
     const list=state.patients.filter(p=>[p.name,p.medicalRecordNumber,p.id].some(v=>String(v||"").toLowerCase().includes(searchTerm.toLowerCase())));
@@ -295,7 +295,7 @@
   }
   function patientsPage() {
     const tab=patientHubTab==="history"?"history":"patients";
-    return `${heading("Pasien & pemeriksaan","Cari pasien, buka profil, atau tinjau riwayat pemeriksaan dari satu halaman.",tab==="patients"?`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`:`<button class="button button-primary" data-action="exam">＋ Pemeriksaan baru</button>`)}<div class="hub-tabs" role="tablist" aria-label="Bagian pasien dan pemeriksaan"><button class="hub-tab ${tab==="patients"?"active":""}" role="tab" aria-selected="${tab==="patients"}" data-action="patientHubTab" data-tab="patients">Daftar pasien <span>${state.patients.length}</span></button><button class="hub-tab ${tab==="history"?"active":""}" role="tab" aria-selected="${tab==="history"}" data-action="patientHubTab" data-tab="history">Riwayat pemeriksaan <span>${state.exams.length}</span></button></div>${tab==="patients"?patientListPage():historyPage()}`;
+    return `${heading("Pasien","Cari pasien, buka profil, atau tinjau riwayat pemeriksaan dari satu halaman.",tab==="patients"?`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`:`<button class="button button-primary" data-action="exam">＋ Pemeriksaan baru</button>`)}<div class="hub-tabs" role="tablist" aria-label="Bagian pasien dan pemeriksaan"><button class="hub-tab ${tab==="patients"?"active":""}" role="tab" aria-selected="${tab==="patients"}" data-action="patientHubTab" data-tab="patients">Daftar pasien <span>${state.patients.length}</span></button><button class="hub-tab ${tab==="history"?"active":""}" role="tab" aria-selected="${tab==="history"}" data-action="patientHubTab" data-tab="history">Riwayat pemeriksaan <span>${state.exams.length}</span></button></div>${tab==="patients"?patientListPage():historyPage()}`;
   }
   function patientNewPage() {
     const editing = patient(selectedPatientId);
@@ -420,41 +420,35 @@
   }
   function updateEnvironmentIndicators() {
     const title = document.getElementById("environment-title");
-    const detail = document.getElementById("environment-detail");
     const indicator = document.getElementById("environment-indicator");
     const avatar = document.getElementById("user-mode-avatar");
     const dot = document.getElementById("environment-status-dot");
-    if (!title || !detail || !indicator || !avatar) return;
+    if (!title || !indicator || !avatar) return;
     if (repo.mode === "production") {
       const provider=repo.providerLabel||"RME";
       if (serviceState === "ready") {
         title.textContent = `${provider} terhubung`;
-        detail.textContent = repo.publicDemo ? "Data sintetis bersama tersedia untuk demo publik." : "Data organisasi berhasil dimuat untuk sesi ini.";
         indicator.textContent = `▣ ${provider} · terhubung`;
         avatar.textContent = repo.publicDemo?"DEMO":provider==="Supabase"?"SB":"RME";
         avatar.setAttribute("aria-label", repo.publicDemo?"Demo publik Supabase":`Sesi integrasi ${provider}`);
       } else if (serviceState === "loading") {
         title.textContent = `Menghubungkan ${provider}…`;
-        detail.textContent = "Menunggu respons backend; data belum dikonfirmasi.";
         indicator.textContent = `▣ Menghubungkan ${provider}…`;
         avatar.textContent = provider==="Supabase"?"SB":"RME";
         avatar.setAttribute("aria-label", `Menghubungkan ke ${provider}`);
       } else {
         title.textContent = `Integrasi ${provider} gagal`;
-        detail.textContent = "Backend belum dapat dikonfirmasi. Tidak menggunakan data demo.";
         indicator.textContent = `▣ ${provider} tidak tersedia`;
         avatar.textContent = "ERR";
         avatar.setAttribute("aria-label", `Integrasi ${provider} tidak tersedia`);
       }
     } else if (repo.persistenceMode === "memory-only") {
       title.textContent = "Demo · memori sementara";
-      detail.textContent = "Data sintetis hilang ketika halaman dimuat ulang.";
       indicator.textContent = "▣ Demo · sementara";
       avatar.textContent = "DEMO";
       avatar.setAttribute("aria-label", "Lingkungan demo sementara");
     } else {
       title.textContent = "Mode demo";
-      detail.textContent = "Data simulasi tersimpan di browser ini, bukan RME.";
       indicator.textContent = "▣ Lingkungan demo";
       avatar.textContent = "DEMO";
       avatar.setAttribute("aria-label", "Lingkungan demonstrasi");
