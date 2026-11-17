@@ -70,7 +70,13 @@
         const lms=engine.interpolateLMS(dataset,axis);
         if(lms.status==="available"){
           const z=engine.lmsZScore(raw.value,lms.lms.L,lms.lms.M,lms.lms.S,{extremeCorrection:dataset.extremeCorrection!==false});
-          if(z.status==="calculated"){zScore=z.zScore;referenceStatus="validated";} else referenceStatus=z.reason||z.status;
+          if(z.status==="calculated"){
+            if(engine.isExtremeZScore?.(ref.indexType,z.zScore)){
+              excluded.push({examId:e.id,date:e.examDate,ageMonths:months,reason:"who_flagged_extreme_z_score",observedZScore:z.zScore});
+              continue;
+            }
+            zScore=z.zScore;referenceStatus="validated";
+          } else referenceStatus=z.reason||z.status;
         } else referenceStatus=lms.reason||lms.status;
         standardLabel=`${ref.standardId} · ${dataset.datasetVersion}`;
       }
@@ -112,10 +118,11 @@
     if(!patientExams.length)warnings.push("Belum ada riwayat pengukuran untuk pasien ini.");
     if(patientExams.length&&!points.length)warnings.push("Tidak ada titik yang dapat diplot untuk indeks ini. Periksa kelengkapan pengukuran dan cakupan usia.");
     if(points.some(p=>p.referenceStatus!=="validated"))warnings.push("Kurva/interpretasi WHO tidak tersedia untuk sebagian atau seluruh titik karena dataset resmi tervalidasi belum terpasang. Titik yang terlihat hanya nilai ukur, bukan kategori klinis.");
-    if(excluded.length)warnings.push(`${excluded.length} catatan tidak diplot karena data tidak lengkap, tanggal tidak valid, atau usia di luar cakupan indeks.`);
+    if(excluded.length)warnings.push(`${excluded.length} catatan tidak diplot karena kualitas data, cakupan usia, edema, atau flag Z-score WHO; periksa alasan pada riwayat pemeriksaan.`);
     if(points.some(p=>p.sameDate))warnings.push("Ada lebih dari satu pemeriksaan pada tanggal yang sama. Titik ditampilkan terpisah dan garis longitudinal diputus di tanggal tersebut.");
     if(excluded.some(e=>e.reason==="edema_present_weight_based_index_withheld"))warnings.push("Titik berbasis berat badan tidak diplot pada pemeriksaan dengan edema.");
     if(excluded.some(e=>e.reason==="edema_status_unknown_weight_based_index_withheld"))warnings.push("Titik berbasis berat badan tidak diplot karena status edema belum dikonfirmasi.");
+    if(excluded.some(e=>e.reason==="who_flagged_extreme_z_score"))warnings.push("Sebagian titik dikeluarkan dari kurva karena Z-score melewati batas flag WHO; periksa ulang tanggal dan nilai pengukuran. Catatan mentah tetap tersimpan.");
     const referenceSource=curves.length?[...new Set(curveSources.map(s=>`${s.standardId} ${s.datasetVersion} · ${s.sourceUrl||"sumber tidak dicantumkan"} · lisensi: ${s.license||"tidak dicantumkan"}`))].join("; "):"Dataset kurva WHO resmi belum tersedia";
     return {status:points.length?"has_data":"empty",indexType,label:cfg.label,unit:cfg.unit,axisLabel:"Usia saat pemeriksaan (bulan; dihitung dari tanggal lahir dan tanggal pemeriksaan)",points,segments,curves,curveSources,excluded,warnings,referenceAvailable:curves.length>0,referenceSource,sex:patient.sexAtBirth,patientId:patient.id,synthetic:patient.isDemo===true};
   }

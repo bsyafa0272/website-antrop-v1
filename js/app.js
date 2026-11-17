@@ -12,7 +12,7 @@
   const esc = utils.escape;
   const themeStorageKey = "pediatricAnthropometry.theme.v1";
   const themeSelect = document.getElementById("theme-select");
-  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+  const systemTheme = window.matchMedia?.("(prefers-color-scheme: dark)") || {matches:false,addEventListener(){},addListener(){}};
   let themePreference = "system";
   try {
     const savedTheme = localStorage.getItem(themeStorageKey);
@@ -65,19 +65,27 @@
   const patient = id => state.patients.find(p => p.id === id) || null;
   const exam = id => state.exams.find(e => e.id === id) || null;
   const examsFor = id => state.exams.filter(e => !id || e.patientId === id).sort((a,b)=>b.examDate.localeCompare(a.examDate)||b.createdAt.localeCompare(a.createdAt));
+  function validCalculationCount() {
+    if(!growthEngine)return 0;
+    return state.exams.filter(record=>{
+      const p=patient(record.patientId);
+      if(!p||record.dataValidationStatus==="failed_validation"||record.verificationStatus==="failed_validation")return false;
+      return growthEngine.evaluateExam(p,record).results.some(result=>result.validityStatus==="valid"&&Number.isFinite(result.zScore));
+    }).length;
+  }
   const qualityClass = s => s === "valid" ? "status-ok" : s === "failed_validation" ? "status-alert" : "status-neutral";
   const interpretationClass = s => s === "valid" ? "status-ok" : s === "failed_validation" ? "status-alert" : "status-neutral";
   const status = (label, cls="status-neutral") => `<span class="status ${cls}">${esc(label)}</span>`;
   function notify(message) { toast.textContent=message; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),3500); }
   const growthEngine = window.PediatricGrowthEngine;
   const growthChart = window.PediatricGrowthChart;
-  const growthStatusLabel = result => ({valid:result.interpretationStatus==="clinical_review_required"?"Z-score valid; kategori perlu tinjauan klinis":"Dihitung dan tervalidasi",not_calculated:result.reason==="verified_reference_dataset_not_loaded"?"Belum dihitung — dataset resmi belum tersedia":result.reason==="edema_present_weight_based_index_withheld"?"Tidak dihitung — edema tercatat":result.reason==="edema_status_unknown_weight_based_index_withheld"?"Belum dihitung — status edema belum dikonfirmasi":"Belum dihitung",incomplete:"Data tidak lengkap",failed_validation:"Gagal validasi",out_of_reference_range:"Di luar rentang referensi",not_applicable:"Tidak berlaku untuk usia ini",clinical_review_required:"Perlu peninjauan klinis"})[result.validityStatus]||"Belum dihitung";
+  const growthStatusLabel = result => ({valid:result.interpretationStatus==="clinical_review_required"?"Z-score valid; kategori perlu tinjauan klinis":"Dihitung dan tervalidasi",extreme_z_score:"Flag WHO — periksa pengukuran",not_calculated:result.reason==="verified_reference_dataset_not_loaded"?"Belum dihitung — dataset resmi belum tersedia":result.reason==="edema_present_weight_based_index_withheld"?"Tidak dihitung — edema tercatat":result.reason==="edema_status_unknown_weight_based_index_withheld"?"Belum dihitung — status edema belum dikonfirmasi":"Belum dihitung",incomplete:"Data tidak lengkap",failed_validation:"Gagal validasi",out_of_reference_range:"Di luar rentang referensi",not_applicable:"Tidak berlaku untuk usia ini",clinical_review_required:"Perlu peninjauan klinis"})[result.validityStatus]||"Belum dihitung";
   const normalGrowthCategories = new Set(["Berat badan normal","Dalam rentang rujukan","Gizi baik"]);
   const growthCategoryClass = result => result.validityStatus === "valid" && Number.isFinite(result.zScore) && result.category && !normalGrowthCategories.has(result.category) ? "growth-category-abnormal" : "";
   function growthResultsMarkup(evaluation) {
     if(!evaluation || !evaluation.age?.valid) return `<div class="panel-body"><p class="muted">Pilih pasien dan tanggal pemeriksaan yang valid untuk menentukan cakupan indeks.</p></div>`;
     const bmi=evaluation.bmi?.status==="calculated"?`${evaluation.bmi.value.toFixed(2)} kg/m²`:(evaluation.bmi?.status==="incomplete"?"Belum tersedia":"Tidak valid");
-    const rows=evaluation.results.map(r=>`<tr><td><strong>${esc(r.label)}</strong><div class="subtext">${esc(r.standardId)} · ${esc(r.referenceStandardVersion)}</div></td><td>${r.calculatedValue===null||r.calculatedValue===undefined?"—":`${Number(r.calculatedValue).toFixed(2)} ${esc(r.unit)}`}</td><td>${Number.isFinite(r.zScore)?r.zScore.toFixed(2):"—"}</td><td><span class="${growthCategoryClass(r)}">${esc(r.category||"—")}</span></td><td>${esc(r.threshold||"—")}</td><td>${esc(growthStatusLabel(r))}<div class="subtext">${esc(r.reason||"")}</div></td></tr>`).join("");
+    const rows=evaluation.results.map(r=>{const score=Number.isFinite(r.zScore)?r.zScore:Number.isFinite(r.observedZScore)?r.observedZScore:null;const flagged=r.validityStatus==="extreme_z_score";return `<tr><td><strong>${esc(r.label)}</strong><div class="subtext">${esc(r.standardId)} · ${esc(r.referenceStandardVersion)}</div></td><td>${r.calculatedValue===null||r.calculatedValue===undefined?"—":`${Number(r.calculatedValue).toFixed(2)} ${esc(r.unit)}`}</td><td>${score===null?"—":`${flagged?"⚠ ":""}${score.toFixed(2)}`}</td><td><span class="${flagged?"growth-category-abnormal":growthCategoryClass(r)}">${esc(flagged?"Periksa pengukuran":r.category||"—")}</span></td><td>${esc(r.threshold||"—")}</td><td>${esc(growthStatusLabel(r))}<div class="subtext">${esc(r.reason||"")}</div></td></tr>`;}).join("");
     return `<div class="panel-body"><div class="profile-grid"><div class="detail-tile"><span>IMT terhitung</span><strong>${esc(bmi)}</strong><div class="subtext">Rumus BB (kg) / [TB (m)]². Hasil per indeks di bawah memperhitungkan usia dan rujukan WHO.</div></div><div class="detail-tile"><span>Mesin</span><strong>${esc(evaluation.algorithmVersion)}</strong><div class="subtext">Skema referensi ${esc(evaluation.referenceSchemaVersion)}</div></div><div class="detail-tile"><span>Status dataset</span><strong>${window.GrowthReferenceData.datasetCount()>0?"WHO LMS aktif":"Belum tersedia"}</strong><div class="subtext">${window.GrowthReferenceData.datasetCount()>0?"Versi, sumber, lisensi, dan hash tercatat di manifest.":"Dataset rujukan belum termuat."}</div></div></div><div class="note-banner mt-16"><div><strong>Z-score dan kategori adalah hasil skrining antropometri otomatis.</strong> Tinjau mutu pengukuran, kondisi klinis (termasuk edema), tren pertumbuhan, dan standar yang berlaku. Hasil prototipe ini bukan diagnosis atau pengganti keputusan tenaga kesehatan.</div></div><div class="table-wrap mt-16"><table><thead><tr><th>Indeks / standar</th><th>Nilai</th><th>Z-score</th><th>Kategori</th><th>Ambang</th><th>Status validitas</th></tr></thead><tbody>${rows}</tbody></table></div><p class="subtext mt-16">Standar rujukan: WHO Child Growth Standards 2006 dan WHO Growth Reference 2007. Kategori yang dikonfigurasi mengikuti Permenkes RI No. 2 Tahun 2020; indeks tanpa ambang nasional yang dikonfigurasi hanya menampilkan Z-score.</p></div>`;
   }
   function growthInterpretationMarkup(evaluation, indexType, examDate=null) {
@@ -113,14 +121,16 @@
       else description="Z-score berada antara −2 dan +2 SD dari median rujukan WHO. Indeks ini belum memiliki kategori otomatis yang dikonfigurasi.";
     }else if(result.reason==="edema_present_weight_based_index_withheld")description="Perhitungan indeks berbasis berat badan ditahan karena edema tercatat pada pemeriksaan ini.";
     else if(result.reason==="edema_status_unknown_weight_based_index_withheld")description="Konfirmasikan status edema pada pemeriksaan ini untuk menghitung indeks berbasis berat badan.";
+    else if(result.validityStatus==="extreme_z_score")description="Z-score melewati batas flag WHO. Nilai ukur tetap tersimpan, tetapi hasil ini tidak dikategorikan atau dimasukkan ke ringkasan sebelum pengukuran diperiksa.";
     else if(result.validityStatus==="incomplete")description="Nilai belum dapat diinterpretasikan karena data yang dibutuhkan untuk indeks ini belum lengkap.";
     else if(result.validityStatus==="not_applicable")description="Indeks ini tidak dihitung karena usia berada di luar cakupan standar rujukannya.";
     else if(result.validityStatus==="out_of_reference_range")description="Nilai berada di luar rentang tabel rujukan WHO dan tidak diekstrapolasi.";
     else if(result.validityStatus==="failed_validation")description="Periksa kembali tanggal, jenis kelamin, posisi ukur, dan nilai yang dimasukkan.";
     else description="Z-score belum tersedia untuk pemeriksaan ini; periksa kelengkapan data dan status dataset rujukan.";
-    const score=Number.isFinite(result.zScore)?`Z-score ${result.zScore>0?"+":""}${result.zScore.toFixed(2)} SD`:"Z-score belum tersedia";
+    const displayedScore=Number.isFinite(result.zScore)?result.zScore:Number.isFinite(result.observedZScore)?result.observedZScore:null;
+    const score=displayedScore!==null?`${result.validityStatus==="extreme_z_score"?"Flag WHO · ":"Z-score "}${displayedScore>0?"+":""}${displayedScore.toFixed(2)} SD`:"Z-score belum tersedia";
     const category=result.category?`Kategori: ${result.category}.`:"Kategori otomatis tidak tersedia untuk indeks ini.";
-    const abnormal=growthCategoryClass(result)!=="";
+    const abnormal=growthCategoryClass(result)!==""||result.validityStatus==="extreme_z_score";
     return `<section class="growth-interpretation" aria-live="polite"><div><strong>Interpretasi singkat · ${esc(result.label)}</strong>${examDate?`<span class="growth-interpretation-date">Pengukuran ${utils.formatDate(examDate)}</span>`:""}<p>${esc(description)}</p></div><span class="growth-interpretation-score ${abnormal?"growth-category-abnormal":""}">${abnormal?`<svg class="growth-warning-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg>`:""}${esc(score)}${result.category?` · ${esc(result.category)}`:""}</span><small>Hasil skrining berdasarkan rujukan WHO; ${esc(category)} Tinjauan tenaga kesehatan tetap diperlukan.</small></section>`;
   }
   function liveGrowthChartMarkup(p, draft) {
@@ -136,10 +146,16 @@
     const evaluation=growthEngine.evaluateExam(p,draft);
     return `<div class="growth-controls"><div class="field"><label for="exam-growth-index">Kurva indeks</label><select id="exam-growth-index">${options.map(o=>`<option value="${esc(o.value)}" ${o.value===index?"selected":""}>${esc(o.label)}</option>`).join("")}</select></div></div><div class="growth-reference-meta mt-16"><strong>${model.referenceAvailable?"Kurva WHO dan titik pemeriksaan":"Titik pengukuran pasien"}</strong><span>${model.referenceAvailable?esc(model.referenceSource):"Kurva rujukan tidak tersedia untuk indeks ini."}</span></div>${model.warnings.length?`<div class="note-banner mt-16"><div>${model.warnings.map(esc).join(" ")}</div></div>`:""}${growthChart.renderSvg(model)}${growthInterpretationMarkup(evaluation,index,draft.examDate)}<p class="subtext">Kurva dan titik mengikuti tanggal, indeks, posisi ukur, serta status edema yang sedang dipilih.</p>`;
   }
-  async function refresh() {
+  let lastSuccessfulRefreshAt=0;
+  async function refresh({force=false}={}) {
+    if(!force&&serviceState==="ready"&&Date.now()-lastSuccessfulRefreshAt<15000)return false;
     serviceState = "loading";
-    try { state=await repo.getSnapshot(); serviceState="ready"; serviceError=""; serviceCode=""; }
+    try { state=await repo.getSnapshot(); serviceState="ready"; serviceError=""; serviceCode=""; lastSuccessfulRefreshAt=Date.now(); return true; }
     catch (error) { serviceState="error"; serviceError=error?.message||"Backend tidak dapat dimuat."; serviceCode=error?.code||""; throw error; }
+  }
+  async function refreshForNavigation() {
+    if(!isProduction()||(serviceState==="ready"&&Date.now()-lastSuccessfulRefreshAt<15000))return;
+    serviceState="loading";render();await refresh({force:true});
   }
   const isProduction = () => repo.mode === "production";
   const backendLabel = () => repo.providerLabel || "backend";
@@ -270,7 +286,7 @@
     const recent=examsFor(null).slice(0,5);
     return `${heading("Dashboard pemantauan antropometri",isProduction()?`Kelola profil dan telusuri pengukuran longitudinal dari ${esc(backendLabel())}.`:"Kelola profil pasien demo dan telusuri pengukuran longitudinal.",`<button class="button button-primary" data-action="patientNew">＋ Pasien baru</button>`)}
       ${demoNote("MODE DEMONSTRASI — DATA SIMULASI","Semua pasien dan pemeriksaan di aplikasi ini sintetis, terpisah dari data pasien nyata, dan belum terhubung ke RME.")}
-      <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Snapshot antropometri valid</div><div class="stat-value">${state.exams.filter(e=>e.anthropometryCalculation?.results?.some(r=>r.validityStatus==="valid")).length}</div><div class="stat-foot">Perhitungan layar memakai WHO LMS aktif</div></div></div>
+      <div class="stats-grid"><div class="stat-card"><div class="stat-top">${isProduction()?"Profil pasien":"Profil pasien demo"}</div><div class="stat-value">${state.patients.length}</div><div class="stat-foot">ID pasien unik</div></div><div class="stat-card"><div class="stat-top">Catatan pemeriksaan</div><div class="stat-value">${state.exams.length}</div><div class="stat-foot">Riwayat tersimpan terpisah</div></div><div class="stat-card"><div class="stat-top">Data belum lengkap</div><div class="stat-value">${state.exams.filter(e=>e.dataValidationStatus==="incomplete").length}</div><div class="stat-foot">Perlu dilengkapi atau diverifikasi</div></div><div class="stat-card"><div class="stat-top">Pemeriksaan dengan hasil valid</div><div class="stat-value">${validCalculationCount()}</div><div class="stat-foot">Dihitung ulang dari pengukuran dan WHO LMS</div></div></div>
       <div class="dashboard-grid"><div>${panel("Pemeriksaan terbaru","Urut berdasarkan tanggal pemeriksaan",`<div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Pasien</th><th>Berat / panjang-tinggi</th><th>Kelengkapan</th><th></th></tr></thead><tbody>${examRows(recent)}</tbody></table></div>`,`<button class="button button-secondary" data-action="history">Lihat riwayat</button>`)}${panel("Akses cepat","",`<div class="panel-body"><div class="quick-grid"><button class="quick-action" data-action="patients"><div class="quick-icon">♙</div><strong>Pasien &amp; pemeriksaan</strong><span>Cari pasien atau tinjau riwayat</span></button><button class="quick-action" data-action="exam"><div class="quick-icon">＋</div><strong>Pemeriksaan baru</strong><span>Tambah catatan tanpa menimpa riwayat</span></button></div></div>`)}</div><div>${panel("Keamanan interpretasi","Status penghitungan antropometri",`<div class="panel-body"><p class="muted">${state.exams.length} pemeriksaan tersimpan. Tampilan pemeriksaan dan profil menghitung ulang Z-score dari WHO LMS untuk indeks yang memenuhi cakupan. Hasil perlu ditinjau bersama mutu ukur dan keadaan klinis; grafik rujukan hanya muncul jika tabel yang sesuai tersedia.</p></div>`)}${panel(isProduction()?`Penyimpanan ${esc(backendLabel())}`:"Penyimpanan demo","Adapter data aktif",`<div class="panel-body"><p class="muted">${esc(repo.adapterName)}. ${isProduction()?`Perubahan dikirim ke ${esc(backendLabel())}; akses dan audit dikelola oleh backend.`:"Perubahan disimpan di localStorage demo browser ini, dengan jejak audit lokal untuk pembuatan dan koreksi. Ini bukan penyimpanan klinis."}</p><button class="button button-secondary" data-action="audit">Lihat jejak perubahan</button></div>`)}</div></div>`;
   }
   function patientListPage() {
@@ -376,7 +392,7 @@
     const growthEvaluation=p&&interpretedExam&&growthEngine?growthEngine.evaluateExam(p,interpretedExam):null;
     const indexOptions=options.map(o=>`<option value="${esc(o.value)}" ${o.value===currentGrowthIndex?"selected":""}>${esc(o.label)}</option>`).join("");
     const pointRows=(model?.points||[]).map(pt=>`<tr><td>${utils.formatDate(pt.date)}<div class="subtext">${esc(pt.examId)}</div></td><td>${pt.ageLabel} <span class="subtext">(${pt.ageDays} hari)</span></td><td>${pt.value.toFixed(2)} ${esc(pt.unit)}</td><td>${pt.zScore===null?"—":pt.zScore.toFixed(2)}</td><td>${pt.referenceStatus==="validated"?status("Referensi tersedia","status-ok"):status("Referensi belum tersedia")}${pt.measurementStatus==="incomplete"?`<div class="subtext">Catatan keseluruhan tidak lengkap; nilai indeks tersedia</div>`:""}${pt.sameDate?`<div class="subtext">Tanggal duplikat; tidak dihubungkan</div>`:""}</td><td><button class="button button-quiet" data-action="growthPoint" data-id="${esc(pt.examId)}">Detail pemeriksaan →</button></td></tr>`).join("");
-    const excludedRows=(model?.excluded||[]).map(pt=>{const e=rows.find(r=>r.id===pt.examId);return `<tr><td>${utils.formatDate(pt.date)}<div class="subtext">${esc(pt.examId)}</div></td><td colspan="4">${esc(pt.reason==="outside_reference_age_coverage"?"Usia di luar cakupan indeks":pt.reason==="invalid_exam_date_or_before_birth"?"Tanggal tidak valid":pt.reason==="measurement_failed_validation"?"Data pemeriksaan gagal validasi; tidak diplot":pt.reason==="edema_present_weight_based_index_withheld"?"Edema ditemukan; indeks berbasis berat badan tidak diplot":pt.reason==="edema_status_unknown_weight_based_index_withheld"?"Status edema belum diketahui; indeks berbasis berat badan tidak diplot":`Tidak dapat diplot: ${pt.reason}`)}</td><td>${e?`<button class="button button-quiet" data-action="growthPoint" data-id="${esc(e.id)}">Lihat catatan →</button>`:"—"}</td></tr>`;}).join("");
+    const excludedRows=(model?.excluded||[]).map(pt=>{const e=rows.find(r=>r.id===pt.examId);return `<tr><td>${utils.formatDate(pt.date)}<div class="subtext">${esc(pt.examId)}</div></td><td colspan="4">${esc(pt.reason==="outside_reference_age_coverage"?"Usia di luar cakupan indeks":pt.reason==="invalid_exam_date_or_before_birth"?"Tanggal tidak valid":pt.reason==="measurement_failed_validation"?"Data pemeriksaan gagal validasi; tidak diplot":pt.reason==="who_flagged_extreme_z_score"?`Z-score ${Number.isFinite(pt.observedZScore)?pt.observedZScore.toFixed(2):""} melewati batas flag WHO; periksa pengukuran. Tidak dimasukkan ke kurva.`:pt.reason==="edema_present_weight_based_index_withheld"?"Edema ditemukan; indeks berbasis berat badan tidak diplot":pt.reason==="edema_status_unknown_weight_based_index_withheld"?"Status edema belum diketahui; indeks berbasis berat badan tidak diplot":`Tidak dapat diplot: ${pt.reason}`)}</td><td>${e?`<button class="button button-quiet" data-action="growthPoint" data-id="${esc(e.id)}">Lihat catatan →</button>`:"—"}</td></tr>`;}).join("");
     const legend=model?.referenceAvailable?`<div class="growth-legend"><span><i class="legend-point"></i> Pemeriksaan pasien</span><span><i class="legend-line"></i> Hubungan longitudinal (tanggal unik)</span>${[-3,-2,-1,0,1,2,3].map(z=>`<span><i class="legend-z legend-z-${z<0?`m${Math.abs(z)}`:z}"></i>Z = ${z} SD</span>`).join("")}</div>`:`<div class="growth-legend"><span><i class="legend-point"></i> Pemeriksaan pasien</span><span><i class="legend-line"></i> Hubungan longitudinal (tanggal unik)</span></div>`;
     const warningText=(model?.warnings||[]).join(" ");
     return `${heading("Kurva pertumbuhan longitudinal","Kurva mengambil catatan dari riwayat pasien tersimpan. Titik adalah pengukuran, bukan diagnosis.",`<button class="button button-secondary" data-action="printGrowth">Cetak</button> <button class="button button-primary" data-action="exportGrowth">Ekspor CSV</button>`)}${repo.mode === "production" ? "" : note("MODE DEMONSTRASI — DATA SIMULASI","Seluruh profil dan titik yang ditampilkan di proyek ini adalah data sintetis. Jangan gunakan sebagai dasar keputusan klinis.")}
@@ -393,9 +409,9 @@
   }
   function reportsPage() {
     return `${heading("Ringkasan laporan","Lihat cakupan data dan hasil skrining antropometri seluruh pasien.")}
-      <div class="stats-grid"><div class="stat-card"><div class="stat-top">Pasien</div><div class="stat-value">${state.patients.length}</div></div><div class="stat-card"><div class="stat-top">Pemeriksaan</div><div class="stat-value">${state.exams.length}</div></div><div class="stat-card"><div class="stat-top">Audit events</div><div class="stat-value">${state.auditEvents.length}</div></div><div class="stat-card"><div class="stat-top">Hasil tervalidasi</div><div class="stat-value">${state.interpretations.filter(i=>i.validationStatus==="valid").length}</div></div></div>
+      <div class="stats-grid"><div class="stat-card"><div class="stat-top">Pasien</div><div class="stat-value">${state.patients.length}</div></div><div class="stat-card"><div class="stat-top">Pemeriksaan</div><div class="stat-value">${state.exams.length}</div></div><div class="stat-card"><div class="stat-top">Audit events</div><div class="stat-value">${state.auditEvents.length}</div></div><div class="stat-card"><div class="stat-top">Pemeriksaan dengan hasil valid</div><div class="stat-value">${validCalculationCount()}</div><div class="stat-foot">Perhitungan ulang berdasarkan data terbaru</div></div></div>
       ${note("Catatan interpretasi","Ringkasan otomatis ini untuk skrining. Tinjau pengukuran dan kondisi klinis; hasil bukan diagnosis.")}
-      ${panel("Jumlah pemeriksaan per pasien",isProduction()?"Data dari backend RME":"Data demo",`<div class="table-wrap"><table><thead><tr><th>Pasien</th><th>Jumlah pemeriksaan</th><th>Terbaru</th><th></th></tr></thead><tbody>${state.patients.map(p=>{const es=examsFor(p.id);return `<tr><td>${patientCell(p)}</td><td>${es.length}</td><td>${es[0]?utils.formatDate(es[0].examDate):"—"}</td><td><button class="button button-secondary" data-action="profile" data-id="${esc(p.id)}">Buka</button></td></tr>`;}).join("")}</tbody></table></div>`)}
+      ${panel("Jumlah pemeriksaan per pasien",repo.publicDemo?"Data sintetis demo publik Supabase":isProduction()?`Data dari ${esc(backendLabel())}`:"Data demo",`<div class="table-wrap"><table><thead><tr><th>Pasien</th><th>Jumlah pemeriksaan</th><th>Terbaru</th><th></th></tr></thead><tbody>${state.patients.map(p=>{const es=examsFor(p.id);return `<tr><td>${patientCell(p)}</td><td>${es.length}</td><td>${es[0]?utils.formatDate(es[0].examDate):"—"}</td><td><button class="button button-secondary" data-action="profile" data-id="${esc(p.id)}">Buka</button></td></tr>`;}).join("")}</tbody></table></div>`)}
       ${combinedAnthropometryMarkup()}`;
   }
   function auditPage() {
@@ -464,7 +480,7 @@
   }
   document.addEventListener("click", async e=>{
     const nav=e.target.closest("[data-page]"); if(nav){
-      try { if(isProduction()){serviceState="loading";render();await refresh();} if(nav.dataset.page==="exam")currentExamId="";if(nav.dataset.page==="patients"){patientHubTab="patients";historyFilterPatientId="";}setPage(nav.dataset.page); }
+      try { await refreshForNavigation(); if(nav.dataset.page==="exam")currentExamId="";if(nav.dataset.page==="patients"){patientHubTab="patients";historyFilterPatientId="";}setPage(nav.dataset.page); }
       catch(err){handleError(err);} return;
     }
     const action=e.target.closest("[data-action]"); if(!action)return;
@@ -478,19 +494,19 @@
     }
     try {
       if(next==="appBack"){
-        if(isProduction()){serviceState="loading";render();await refresh();}
+        await refreshForNavigation();
         const previousPage=pageHistory.pop()||"dashboard";
         setPage(previousPage,{fromHistory:true});return;
       }
       if(next==="patientHubTab"){patientHubTab=action.dataset.tab==="history"?"history":"patients";render();return;}
-      if(isProduction() && ["profile","exam","patientNew","editPatient","deletePatient","patients","dashboard","reports","growth","history","examDetail","results","editExam","audit","growthPoint"].includes(next)) { serviceState="loading";render();await refresh(); }
+      if(isProduction() && ["profile","exam","patientNew","editPatient","deletePatient","patients","dashboard","reports","growth","history","examDetail","results","editExam","audit","growthPoint"].includes(next)) await refreshForNavigation();
       if(next==="profile") { selectedPatientId=id||""; currentExamId=""; historyFilterPatientId=""; setPage("profile"); return; }
       if(next==="exam") { if(id&&patient(id))selectedPatientId=id; currentExamId=""; setPage("exam"); return; }
       if(next==="patientNew") { selectedPatientId=""; setPage("patientNew"); return; }
       if(next==="editPatient") { if(!patient(id)) throw new Repository.RepositoryError("NOT_FOUND","Pasien tidak ditemukan."); selectedPatientId=id; setPage("patientNew"); return; }
       if(next==="deletePatient") {
         const removed=await repo.deletePatient(id);
-        await refresh();
+        await refresh({force:true});
         selectedPatientId="";currentExamId="";historyFilterPatientId="";searchTerm="";
         notify(`Pasien dihapus beserta ${removed?.deletedExams??"seluruh"} riwayat pemeriksaan.`);
         setPage("patients");return;
@@ -501,7 +517,7 @@
       if(next==="editExam") { currentExamId=id||""; const existing=exam(currentExamId); if(!existing) throw new Repository.RepositoryError("NOT_FOUND","Pemeriksaan tidak ditemukan."); selectedPatientId=existing.patientId;setPage("exam");return; }
       if(next==="audit") {setPage("audit");return;}
       if(next==="growthPoint") { currentExamId=id||""; setPage("examDetail"); return; }
-      if(next==="retryData") { serviceState="loading"; render(); await refresh(); render(); notify(repo.mode === "production" ? "Data backend berhasil dimuat ulang." : "Data demo berhasil dimuat ulang."); return; }
+      if(next==="retryData") { serviceState="loading"; render(); await refresh({force:true}); render(); notify(repo.mode === "production" ? "Data backend berhasil dimuat ulang." : "Data demo berhasil dimuat ulang."); return; }
       if(next==="supabaseSignOut") { await repo.signOut(); state={patients:[],exams:[],interpretations:[],auditEvents:[]};serviceState="error";serviceCode="UNAUTHENTICATED";serviceError="Sesi telah diakhiri.";render();return; }
       if(next==="printGrowth") { if(typeof window.print==="function")window.print(); return; }
       if(next==="exportGrowth") { exportGrowthCsv(); return; }
@@ -555,7 +571,7 @@
     if(form.id==="supabase-login"){
       e.preventDefault();const fields=new FormData(form),button=form.querySelector('button[type="submit"]');
       if(button){button.disabled=true;button.textContent="Menghubungkan…";}
-      try{await repo.signIn(String(fields.get("email")||""),String(fields.get("password")||""));state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";render();notify("Supabase terhubung; data organisasi berhasil dimuat.");}
+      try{await repo.signIn(String(fields.get("email")||""),String(fields.get("password")||""));state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";lastSuccessfulRefreshAt=Date.now();render();notify("Supabase terhubung; data organisasi berhasil dimuat.");}
       catch(error){serviceState="error";serviceCode=error?.code||"";serviceError=error?.message||"Login Supabase gagal.";render();}
       return;
     }
@@ -571,7 +587,7 @@
         const input={version:fd.get("version")||undefined,name:fd.get("name"),medicalRecordNumber:fd.get("medicalRecordNumber"),birthDate:fd.get("birthDate"),sexAtBirth:fd.get("sexAtBirth"),gestationalAgeAtBirth:weeks?{weeks,days}:null,guardianName:fd.get("guardianName"),clinicalNotes:fd.get("clinicalNotes")};
         const editId=form.dataset.editId;
         const saved=editId?await repo.updatePatient(editId,input):await repo.createPatient(input);
-        await refresh(); selectedPatientId=saved.id; searchTerm="";notify(successPersistenceMessage(editId?"Profil diperbarui; jejak koreksi dicatat":"Profil dibuat")+` ID: ${saved.id}`);setPage("profile");return;
+        await refresh({force:true}); selectedPatientId=saved.id; searchTerm="";notify(successPersistenceMessage(editId?"Profil diperbarui; jejak koreksi dicatat":"Profil dibuat")+` ID: ${saved.id}`);setPage("profile");return;
       }
       const input={patientId:String(fd.get("patientId")||""),rmeVisitId:fd.get("rmeVisitId"),version:fd.get("version")||undefined,examDate:fd.get("examDate"),weightKg:fd.get("weightKg"),lengthHeightCm:fd.get("lengthHeightCm"),measurementType:fd.get("measurementType"),edemaStatus:fd.get("edemaStatus"),headCircumferenceCm:fd.get("headCircumferenceCm"),midUpperArmCircumferenceCm:fd.get("midUpperArmCircumferenceCm"),notes:fd.get("notes")};
       const metricFields=[["weightKg","Berat badan"],["lengthHeightCm","Panjang/tinggi badan"],["headCircumferenceCm","Lingkar kepala"],["midUpperArmCircumferenceCm","Lingkar lengan atas"]];
@@ -584,12 +600,12 @@
       const wasEditing=Boolean(currentExamId);
       let saved;
       if(wasEditing) saved=await repo.updateExam(currentExamId,input); else saved=await repo.createExam(input);
-      await refresh(); selectedPatientId=saved.patientId; currentExamId=""; historyFilterPatientId="";notify(successPersistenceMessage(wasEditing?"Pemeriksaan dikoreksi dan jejak perubahan dicatat":"Pemeriksaan baru dibuat"));setPage("profile");
+      await refresh({force:true}); selectedPatientId=saved.patientId; currentExamId=""; historyFilterPatientId="";notify(successPersistenceMessage(wasEditing?"Pemeriksaan dikoreksi dan jejak perubahan dicatat":"Pemeriksaan baru dibuat"));setPage("profile");
     } catch(err) {handleError(err);}
     finally {if(submitButton&&submitButton.isConnected !== false){submitButton.disabled=false;submitButton.textContent=submitLabel;}}
   });
   document.getElementById("menu-toggle").addEventListener("click",()=>sidebar.classList.toggle("open"));
   document.addEventListener("keydown",e=>{if(e.key==="Escape")sidebar.classList.remove("open");});
   content.innerHTML=serviceBanner();
-  (async()=>{try{state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";const params=new URLSearchParams(location.search);if(params.has("exam")){currentExamId=params.get("exam");currentPage="examDetail";}setPage(currentPage);}catch(err){serviceState="error";serviceError=err.message||"Backend tidak tersedia.";serviceCode=err?.code||"";content.innerHTML=serviceBanner();}})();
+  (async()=>{try{state=await repo.initialize();serviceState="ready";serviceError="";serviceCode="";lastSuccessfulRefreshAt=Date.now();const params=new URLSearchParams(location.search);if(params.has("exam")){currentExamId=params.get("exam");currentPage="examDetail";}setPage(currentPage);}catch(err){serviceState="error";serviceError=err.message||"Backend tidak tersedia.";serviceCode=err?.code||"";content.innerHTML=serviceBanner();}})();
 })();

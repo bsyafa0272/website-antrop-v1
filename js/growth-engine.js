@@ -80,6 +80,27 @@
     bmi_for_age_under5:[[-Infinity,-3,"Gizi buruk (severely wasted)"],[-3,-2,"Gizi kurang (wasted)"],[-2,1,"Gizi baik"],[1,2,"Berisiko gizi lebih"],[2,3,"Gizi lebih"],[3,Infinity,"Obesitas"]],
     bmi_for_age_5_19:[[-Infinity,-3,"Gizi buruk (severely thinness)"],[-3,-2,"Gizi kurang (thinness)"],[-2,1,"Gizi baik"],[1,2,"Gizi lebih (overweight)"],[2,Infinity,"Obesitas"]]
   });
+  // WHO Anthro flag limits: values outside these indicator-specific limits
+  // remain visible for review but must not be interpreted or summarized.
+  const WHO_Z_SCORE_FLAGS = Object.freeze({
+    weight_for_age: Object.freeze({lower:-6,upper:5}),
+    weight_for_age_5_10: Object.freeze({lower:-6,upper:5}),
+    height_for_age_under5: Object.freeze({lower:-6,upper:6}),
+    height_for_age_5_19: Object.freeze({lower:-6,upper:6}),
+    weight_for_length_height: Object.freeze({lower:-5,upper:5}),
+    bmi_for_age_under5: Object.freeze({lower:-5,upper:5}),
+    bmi_for_age_5_19: Object.freeze({lower:-5,upper:5}),
+    head_circumference_for_age: Object.freeze({lower:-5,upper:5}),
+    muac_for_age: Object.freeze({lower:-5,upper:5})
+  });
+  function isExtremeZScore(indexType,zScore) {
+    const limits=WHO_Z_SCORE_FLAGS[indexType];
+    return !!limits&&Number.isFinite(zScore)&&(zScore<limits.lower||zScore>limits.upper);
+  }
+  function whoFlagThreshold(indexType) {
+    const limits=WHO_Z_SCORE_FLAGS[indexType];
+    return limits?`WHO: Z < ${limits.lower} SD atau Z > +${limits.upper} SD`:null;
+  }
   function classifyZScore(indexType, zScore) {
     if (!Number.isFinite(zScore)) return {category:null,threshold:null,status:"not_calculated"};
     const def=registry().indexDefinitions[indexType];
@@ -139,6 +160,7 @@
     const measured=valueKey==="bmi"?bmi.value:valueKey==="lengthHeightCm"?inputValues.correctedLengthHeightCm:inputValues[valueKey];
     const z=lmsZScore(measured,found.lms.L,found.lms.M,found.lms.S,{extremeCorrection:dataset.extremeCorrection!==false});
     if (z.status!=="calculated") return {...base,validityStatus:z.status,reason:z.reason,calculatedValue:measured};
+    if (isExtremeZScore(indexType,z.zScore)) return {...base,calculatedValue:measured,observedZScore:z.zScore,threshold:whoFlagThreshold(indexType),validityStatus:"extreme_z_score",interpretationStatus:"review_measurement",reason:"who_flagged_extreme_z_score",datasetVersion:dataset.datasetVersion,referenceSource:dataset.sourceUrl||standard.sourceUrl,calculationDetails:{axis,axisUnit:def.referenceAxis==="ageDays"?"days":def.referenceAxis==="ageMonths"?"months":"cm",lms:found.lms,rawZScore:z.rawZScore,extremeCorrectionApplied:z.extremeCorrectionApplied,measurementCorrection:corrected?.correctionCm??0}};
     const classified=indexType==="bmi_for_age_5_19"&&age.ageMonths>=228
       ? {category:null,threshold:null,status:"clinical_review_required",note:"Ambang kategori Permenkes berlaku sampai usia 18 tahun; usia 19 tahun memerlukan tinjauan kebijakan."}
       : classifyZScore(indexType,z.zScore);
@@ -159,5 +181,5 @@
     for (const indexType of indexList) results.push(evaluateIndex(indexType,patient,exam,age));
     return {algorithmVersion:ALGORITHM_VERSION,referenceSchemaVersion:REFERENCE_SCHEMA_VERSION,age,bmi,results,overallStatus:results.some(r=>r.validityStatus==="valid")?"partial":results.every(r=>["not_applicable","not_calculated"].includes(r.validityStatus))?"not_calculated":"review_required"};
   }
-  root.PediatricGrowthEngine={ALGORITHM_VERSION,REFERENCE_SCHEMA_VERSION,parseDate,getAge,calculateBMI,correctLengthHeight,lmsZScore,interpolateLMS,classifyZScore,evaluateIndex,evaluateExam};
+  root.PediatricGrowthEngine={ALGORITHM_VERSION,REFERENCE_SCHEMA_VERSION,WHO_Z_SCORE_FLAGS,parseDate,getAge,calculateBMI,correctLengthHeight,lmsZScore,interpolateLMS,isExtremeZScore,whoFlagThreshold,classifyZScore,evaluateIndex,evaluateExam};
 })(typeof window !== "undefined" ? window : globalThis);

@@ -57,7 +57,7 @@ assert.equal(older.results.find(x=>x.indexType==='bmi_for_age_5_19').validitySta
 // Missing measurements and invalid sex/ranges fail closed, with no fabricated values.
 const missing=E.evaluateExam(blankPatient,{examDate:'2024-06-01',weightKg:null,lengthHeightCm:null,measurementType:''});
 assert.equal(missing.bmi.status,'incomplete');
-assert(missing.results.every(x=>x.validityStatus==='incomplete'||x.validityStatus==='not_applicable'));
+assert(missing.results.every(x=>['incomplete','not_applicable','not_calculated'].includes(x.validityStatus)));
 const badSex=E.evaluateExam({birthDate:'2024-01-01',sexAtBirth:'unknown'},blankExam);
 assert(badSex.results.every(x=>x.validityStatus==='failed_validation'&&x.zScore===null&&x.category===null));
 const outRange=E.evaluateExam(blankPatient,{...blankExam,weightKg:999});
@@ -72,6 +72,13 @@ assert.equal(E.classifyZScore('height_for_age_5_19',0).status,'clinical_review_r
 const age19={valid:true,ageDays:Math.round(228*30.4375),ageMonths:228,completedMonths:228};
 const age19Bmi=E.evaluateIndex('bmi_for_age_5_19',{sexAtBirth:'female'},{weightKg:60,lengthHeightCm:165,measurementType:'standing_height',edemaStatus:'absent'},age19);
 assert.equal(age19Bmi.validityStatus,'valid');assert.equal(age19Bmi.zScore!==null,true);assert.equal(age19Bmi.category,null);assert.equal(age19Bmi.interpretationStatus,'clinical_review_required');
+// WHO flag limits preserve the observed score for review but withhold classification and validity.
+const implausiblePatient={birthDate:'2022-01-01',sexAtBirth:'male'};
+const implausibleExam={examDate:'2026-01-01',weightKg:12,lengthHeightCm:21,measurementType:'standing_height',edemaStatus:'absent'};
+const implausibleAge=E.getAge(implausiblePatient.birthDate,implausibleExam.examDate);
+const flaggedBmi=E.evaluateIndex('bmi_for_age_under5',implausiblePatient,implausibleExam,implausibleAge);
+assert.equal(flaggedBmi.validityStatus,'extreme_z_score');assert.equal(flaggedBmi.zScore,null);assert.equal(flaggedBmi.category,null);assert(Number.isFinite(flaggedBmi.observedZScore));
+assert.equal(E.isExtremeZScore('weight_for_age',-6),false);assert.equal(E.isExtremeZScore('weight_for_age',-6.01),true);assert.equal(E.isExtremeZScore('height_for_age_under5',6),false);assert.equal(E.isExtremeZScore('bmi_for_age_under5',5.01),true);
 // Published WHO Anthro 1.1.0 README example (rounded to its two-decimal output).
 const who2006=[
  {sex:'male',days:1001,weight:18,height:120,expected:[2.20,7.31,-2.39,-3.01]},
@@ -82,7 +89,7 @@ const who2006=[
 for(const c of who2006){
  const age={valid:true,ageDays:c.days,ageMonths:c.days/30.4375,completedMonths:Math.floor(c.days/30.4375)};
  const patient={sexAtBirth:c.sex},exam={weightKg:c.weight,lengthHeightCm:c.height,measurementType:'standing_height',edemaStatus:'absent'};
- const values=['weight_for_age','height_for_age_under5','weight_for_length_height','bmi_for_age_under5'].map(k=>Number(E.evaluateIndex(k,patient,exam,age).zScore.toFixed(2)));
+ const values=['weight_for_age','height_for_age_under5','weight_for_length_height','bmi_for_age_under5'].map(k=>{const result=E.evaluateIndex(k,patient,exam,age);return Number((result.zScore??result.observedZScore).toFixed(2));});
  assert.deepEqual(values,c.expected);
 }
 // WHO AnthroPlus 1.1.0 boundary examples for 60.32 and 60.911701 months.

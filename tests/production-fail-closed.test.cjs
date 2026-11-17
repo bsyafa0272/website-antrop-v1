@@ -19,6 +19,7 @@ const els = {
   'user-mode-avatar': element(), 'environment-status-dot': element()
 };
 const document = {
+  documentElement: element(),
   getElementById: id => els[id] || (els[id] = element()),
   querySelectorAll: () => [], querySelector: () => null,
   addEventListener: (name, fn) => { handlers[name] = fn; },
